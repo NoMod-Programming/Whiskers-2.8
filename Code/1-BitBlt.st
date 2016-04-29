@@ -1,6 +1,6 @@
 Object subclass: #BitBlt
 	instanceVariableNames: 'destForm sourceForm halftoneForm combinationRule destX destY width height sourceX sourceY clipX clipY clipWidth clipHeight colorMap '
-	classVariableNames: 'CachedFontColorMaps ColorConvertingMaps '
+	classVariableNames: 'Antialiased CachedFontColorMaps ColorConvertingMaps '
 	poolDictionaries: ''
 	category: 'Graphics-Primitives'!
 !BitBlt commentStamp: 'jm 8/1/2008 20:22' prior: 0!
@@ -462,7 +462,7 @@ drawFrom: startPoint to: stopPoint
 	
 	 ^ self drawFrom: startPoint to: stopPoint withFirstPoint: true! !
 
-!BitBlt methodsFor: 'line drawing' stamp: 'EMP 4/6/2016 14:21'!
+!BitBlt methodsFor: 'line drawing' stamp: 'EMP 4/21/2016 14:34'!
 drawFrom: startPoint to: stopPoint withFirstPoint: drawFirstPoint
 	"Draw a line whose end points are startPoint and stopPoint.
 	The line is formed by repeatedly calling copyBits at every
@@ -470,6 +470,7 @@ drawFrom: startPoint to: stopPoint withFirstPoint: drawFirstPoint
 	the first point so as not to overstrike at line junctions."
 	| offset point1 point2 forwards |
 	"Always draw down, or at least left-to-right"
+
 	forwards _ (startPoint y = stopPoint y and: [startPoint x < stopPoint x])
 				or: [startPoint y < stopPoint y].
 	forwards

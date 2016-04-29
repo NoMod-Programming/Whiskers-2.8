@@ -1072,7 +1072,7 @@ cloneAndSend: msgName
 	clone eventReceived: (ScratchEvent new name: msgName asString argument: 0).
 ! !
 
-!ScratchSpriteMorph methodsFor: 'clone ops' stamp: 'EMP 3/22/2016 11:01'!
+!ScratchSpriteMorph methodsFor: 'clone ops' stamp: 'EMP 4/26/2016 16:46'!
 createCloneOf: anObject
 	"Clone this sprite and send the clone (and only the clone) the given message."
 
@@ -1087,7 +1087,7 @@ createCloneOf: anObject
 		(m isKindOf: BlockMorph) ifTrue: [m stop]].
 
 	frame workPane addMorph: clone.
-	clone eventReceived: (ScratchEvent new name: 'Scratch-StartedAsClone' argument: 1).
+	clone eventReceived: (ScratchClonedEvent new).
 ! !
 
 !ScratchSpriteMorph methodsFor: 'clone ops' stamp: 'EMP 10/2/2015 21:41'!
@@ -1432,7 +1432,7 @@ rotateHandle
 ScratchSpriteMorph class
 	instanceVariableNames: ''!
 
-!ScratchSpriteMorph class methodsFor: 'block specs' stamp: 'EMP 4/11/2016 15:29'!
+!ScratchSpriteMorph class methodsFor: 'block specs' stamp: 'EMP 4/28/2016 14:35'!
 blockSpecs
 
 	| blocks |
@@ -1467,9 +1467,8 @@ blockSpecs
 			('when I start as a clone'		C	-)
 			('create clone of %m.spriteOnly'			-	createCloneOf)
 			('delete clone'					-	deleteClone)
-			"-
-			('report %s'						s	report)
-			xxx This was for a beta of custom reporters; getting more stable now that the argument is accepted as a reporter too"
+			-
+
 		'motion'
 			('move %n steps'				-	forward:)
 			('turn @turnRight %n degrees'				-	turnRight: 15)	"icon shows turn direction"
@@ -1489,7 +1488,7 @@ blockSpecs
 			-
 			('if on edge, bounce'			-	bounceOffEdge)
 			-
-			('set rotation style %m.rotationStyle'			-	setRotStyle:)
+			('set rotation style %m.rotationStyle'			-	setRotationStyle)
 			-
 			('x position'						r	xpos)
 			('y position'						r	ypos)

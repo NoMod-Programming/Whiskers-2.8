@@ -1,6 +1,6 @@
 Object subclass: #ScratchProcess
-	instanceVariableNames: 'stackFrame topBlock readyToYield errorFlag readyToTerminate isFirst ci answer scriptVars '
-	classVariableNames: 'BlockHighlightMSecs '
+	instanceVariableNames: 'stackFrame topBlock readyToYield errorFlag readyToTerminate blockVarList answer atomicityList ci scriptVars tempVars scriptList isPaused timeOffset blockToDebug nextBlockToDebug doneWithDebugging beingAtomic isFirst '
+	classVariableNames: 'BlockHighlightMSecs Times '
 	poolDictionaries: ''
 	category: 'Scratch-Execution Engine'!
 !ScratchProcess commentStamp: 'jm 6/29/2005 18:02' prior: 0!
@@ -16,7 +16,18 @@ Structure:
 !
 
 
-!ScratchProcess methodsFor: 'initialization' stamp: 'EMP 1/12/2016 15:50'!
+!ScratchProcess methodsFor: 'initialization' stamp: 'EMP 4/26/2016 16:05'!
+forBlock: t1 
+	| t2 |
+	beingAtomic := false.
+	topBlock := t1.
+	t2 := topBlock blockSequence.
+	t2 first isHatBlock
+		ifTrue: [t2 := t2 allButFirst].
+	topBlock stopProcess; scratchProc: self.
+	stackFrame := ScratchStackFrame forExpression: t2! !
+
+!ScratchProcess methodsFor: 'initialization' stamp: 'EMP 4/26/2016 15:41'!
 initialize
 
 	stackFrame _ nil.
@@ -24,10 +35,12 @@ initialize
 	errorFlag _ false.
 	readyToTerminate _ false.
 	ci _ 1.
-	scriptVars _ Dictionary new.! !
+	scriptVars _ Dictionary new.
+	tempVars _ VariableFrame new.
+	atomicityList _ OrderedCollection new.! !
 
 
-!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 1/12/2016 14:44'!
+!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 4/14/2016 16:05'!
 answer
 	^ answer! !
 
@@ -38,99 +51,60 @@ errorFlag
 	^ errorFlag
 ! !
 
-!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 10/21/2015 15:16'!
-errorFlag: aBoolean
-	"Set the error flag for this process."
+!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:06'!
+errorFlag: t1 
+	errorFlag := t1.
+	stackFrame
+		ifNotNil: [stackFrame expression showError.
+			stackFrame expression topBlock showErrorFeedback]! !
 
-	errorFlag _ aBoolean.
-	stackFrame expression showError.
-	stackFrame expression topBlock showErrorFeedback.
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 10/21/2015 15:40'!
-errorFlagImmediate: aBoolean
-	"Set the error flag for this process."
-
-	errorFlag _ aBoolean.
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'jm 11/20/2003 11:12'!
-expression: expression
-	"Sets the expression to evaluate. This can be a single block or a collection of blocks. It should only be called before running the process."
-
-	stackFrame ifNotNil: [self error: 'Cannot modify expression'].
-	stackFrame _ ScratchStackFrame new expression: expression.
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'jm 12/9/2008 17:09'!
+!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:07'!
 includesDeletedReceiver
-	"Answer true if I contain a block whose receiver has been deleted."
+	self
+		stackFromFrame: stackFrame
+		upwardsDo: [:t1 | 
+			t1 hasDeletedReceiver
+				ifTrue: [^ true].
+			nil].
+	^ false! !
 
-	self stackAsArray do: [:b |
-		((b isKindOf: CommandBlockMorph) and:
-		 [b receiver owner isNil])
-			ifTrue: [^ true]].
+!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:07'!
+includesReceiver: t1 
+	self
+		stackFromFrame: stackFrame
+		upwardsDo: [:t2 | 
+			(t2 hasReceiver: t1)
+				ifTrue: [^ true].
+			nil].
+	^ false! !
 
-	^ false
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'jm 5/28/2004 20:38'!
-includesReceiver: anObject
-	"Answer true if I have the given object as a block receiver."
-
-	self stackAsArray do: [:frm |
-		((frm respondsTo: #receiver) and: [frm receiver == anObject])
-			ifTrue: [^ true]].
-	^ false
-
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'jm 6/4/2009 13:00'!
+!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:07'!
 isRunning
-	"Answer true if I am still running, have not encountered an error, and don't refer to any deleted objects."
-
-	^ (stackFrame notNil and:
-	   [errorFlag not and:
-	   [self includesDeletedReceiver not]])
-! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'EMP 10/21/2015 15:36'!
-stackFrame
-	^ stackFrame! !
-
-!ScratchProcess methodsFor: 'accessing' stamp: 'jm 12/30/2008 18:33'!
-topBlock: aBlock
-
-	topBlock _ aBlock.
-! !
+	^ stackFrame notNil
+		and: [errorFlag not
+				and: [self includesDeletedReceiver not]]! !
 
 
-!ScratchProcess methodsFor: 'entry points' stamp: 'jm 10/24/2005 18:45'!
-runStepFor: aStageMorph
-	"Evaluates the current expression, then the next, etc., until the next yield."
+!ScratchProcess methodsFor: 'entry points' stamp: 'EMP 4/28/2016 15:13'!
+runStepFor: t1 
+	readyToYield := false.
+	[readyToYield
+		or: [stackFrame isNil]]
+		whileFalse: [(stackFrame evaluateIn: self)
+				ifTrue: [t1 updateTrailsForm.
+					((BlockHighlightMSecs = 1) & (self isAtomic not))
+						ifTrue: [World displayWorldSafely]]].
+	readyToTerminate
+		ifTrue: [[stackFrame isNil]
+				whileFalse: [stackFrame unlightExpression.
+					self popStackFrameNoUnhightlight]]! !
 
-	| expr |
-	"evaluate blocks until we're ready to yield"
-	readyToYield _ false.
-	[readyToYield or: [stackFrame isNil]] whileFalse: [
-		self evaluateFor: aStageMorph].
-
-	readyToTerminate ifTrue: [
-		"pop all stack frames, unlighting enclosing blocks:"
-		[stackFrame isNil] whileFalse: [
-			expr _ stackFrame expression.
-			(expr isKindOf: BlockMorph) ifTrue: [expr litUp: false].
-			self popStackFrame]].
-! !
-
-!ScratchProcess methodsFor: 'entry points' stamp: 'EMP 1/12/2016 15:18'!
-stepUntilDoneFor: aStageMorph
-
-	[self isRunning] whileTrue: [
-		Sensor keyboardPressed.
-		self runStepFor: aStageMorph.
-		self isAtomic].
-! !
+!ScratchProcess methodsFor: 'entry points' stamp: 'EMP 4/26/2016 16:07'!
+stepUntilDoneFor: t1 
+	[self isRunning]
+		whileTrue: [Sensor keyboardPressed.
+			self runStepFor: t1.
+			self isAtomic]! !
 
 !ScratchProcess methodsFor: 'entry points' stamp: 'jm 6/4/2009 13:12'!
 stop
@@ -143,691 +117,411 @@ stop
 ! !
 
 
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/5/2016 14:53'!
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:10'!
 applyPrimitive
 	"Apply the current expression (which must be a CommandBlock) to the current arguments (which must all have been evaluated)."
 
-	| value |
+	| |
 	stackFrame expression isParamGetter 
 	ifTrue: [
-	value _ self getArgumentOrNil: (stackFrame expression selector)]
-	ifFalse: [
-	value _ stackFrame expression evaluateWithArgs: stackFrame arguments].
+	self returnValueToParentFrame: (self getArgumentOrNil: (stackFrame expression selector)). ^ self popStackFrame].
 
 	"save the return value in the parent frame before popStackFrame because popFrame adds a frame while single-stepping"
-	self returnValueToParentFrame: value.
-	self popStackFrame.! !
 
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 2/25/2016 16:28'!
+	self returnValueToParentFrame: stackFrame evaluateExpression.
+	self popStackFrame! !
+
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:10'!
 applyTimedCommand
-	"Applies the current command to the already evaluated list of arguments over a particular time interval."
-
-	| block arguments currentTime startTime args totalMSecs elapsedMSecs |
-	block _ stackFrame expression.
-	arguments _ stackFrame arguments.
-
-	"Do we still need to evaluate more arguments?"
-	arguments size < block argumentCount ifTrue: [^ self evaluateNextArgument].
-	arguments _ block coerceArgs: arguments.
-
-	"Record or get the time when command was first invoked."
-	currentTime _ Time millisecondClockValue.
-	startTime _ stackFrame startTime.
-	startTime ifNil: [  "first call; just set starting time and value"
-		args _ arguments asArray, (Array with: 0 with: nil).
-		stackFrame startValue: (block receiver perform: block selector withArguments: args).
-		stackFrame startTime: currentTime.
-		readyToYield _ true.
-		^ self].
-
-	"Call primitive time command with its arguments and the elapsed time in seconds"
-	totalMSecs _ arguments last * 1000.
-	block selector = #glideSecs:toX:y:elapsed:from: ifTrue: [totalMSecs _ arguments first * 1000].
-	block selector = #mwait:elapsed:from: ifTrue: [totalMSecs _ arguments last].
-	((block selector = #drum:duration:elapsed:from:) or:
-	 [block selector = #noteOn:duration:elapsed:from:])
-		ifTrue: [totalMSecs _ (60000 * arguments second) / block receiver tempo].
-	block selector = #rest:elapsed:from:
-		ifTrue: [totalMSecs _ (60000 * arguments first) / block receiver tempo].
-
-	elapsedMSecs _ currentTime - startTime.
-	currentTime < startTime ifTrue: [elapsedMSecs _ totalMSecs].  "clock wrap"
-	args _ arguments asArray, (Array with: elapsedMSecs with: stackFrame startValue).
-	block receiver perform: block selector withArguments: args.
-
-	"If not done, then we leave stack as is and yield."
-	elapsedMSecs < totalMSecs ifTrue: [
-		self isAtomic ifFalse: [
-		readyToYield _ true].
-		^ self].
-
-	"Pop this command off the stack and return."
-	self popStackFrame.
-
-! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/5/2016 12:15'!
-evaluateCommandFor: aStageMorph
-	"Evaluates the current block. If the argument is non-nil, redraw the stage."
-
-	| expression |
-	expression _ stackFrame expression.
-	((BlockHighlightMSecs > 1) and: [self isAtomic not]) ifTrue: [expression litUp: true].
-
-	expression isSpecialForm ifTrue: [^ self evaluateSpecialForm].
-
-	"evaluate arguments, if necessary"
-	stackFrame arguments size < expression argumentCount
+	| t1 t2 t3 |
+	stackFrame needsMoreArgumentsEvaluated
 		ifTrue: [^ self evaluateNextArgument].
+	t3 := stackFrame coerceArguments.
+	t1 := Time millisecondClockValue.
+	t2 := stackFrame startTime.
+	t2
+		ifNil: [stackFrame startTimedCommandWith: t3 at: t1.
+			readyToYield := true.
+			^ self].
+	(stackFrame stepTimedCommandWith: t3 at: t1)
+		ifTrue: [readyToYield := true.
+			^ self].
+	self popStackFrame! !
 
-	expression isTimed ifTrue: [^ self applyTimedCommand].
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:44'!
+closeAtomic
+	atomicityList removeLast.
+	self popStackFrame! !
 
-	self applyPrimitive.
-	
-		self isAtomic ifTrue: [^ self].
-	aStageMorph ifNotNil: [
-		aStageMorph updateTrailsForm.
-		(BlockHighlightMSecs = 1) ifTrue: [  "normal (non-turbo) mode; redraw after each cmd"
-			World displayWorldSafely]].
-! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 2/25/2016 16:27'!
-evaluateFor: aStageMorph
-	"Evaluates the current expression in the current environment for the given StageMorph."
-
-	| expression |
-	stackFrame shouldYield ifTrue: [(self isAtomic) ifFalse: [^ self yield] ifTrue: [^ self popStackFrame]].
-	expression _ stackFrame expression.
-	stackFrame shouldUnlight ifTrue: [
-		expression litUp: false.
-		^ self popStackFrame].
-
-	expression isCollection ifTrue: [^ self evaluateSequence].
-	expression isArgMorph ifTrue: [^ self evaluateSelfEvaluating].
-	expression isBlockMorph ifTrue: [^ self evaluateCommandFor: aStageMorph].
-
-	self error: 'Unknown expression type:  ', expression printString.
-! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'DaveF 7/9/2003 18:58'!
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:10'!
 evaluateNextArgument
-	"Evaluates the next argument of the command in expression.  Requires that expression be a block that takes more args than are already evaluated in the current stack frame."
+	self pushStackFrame: stackFrame toEvaluateNextArgument! !
 
-	| argumentExpression |
-
-	argumentExpression _ stackFrame expression argumentAt: stackFrame arguments size + 1.
-
-	self pushStackFrame: (ScratchStackFrame new expression: argumentExpression).! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'jm 3/23/2005 09:53'!
-evaluateSelfEvaluating
-	"The easiest case. Evaluate a number, color, or any self-evaluating expression."
-
-	| value |
-	value _ stackFrame expression evaluate.
-	self returnValueToParentFrame: value.
-	self popStackFrame.
-! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 10/26/2015 15:46'!
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:10'!
 evaluateSequence
-	"Requires that the current expression be a collection of blocks.  Evaluates the block in the current expression (which is a list of blocks) at the given pc."
+	| t1 t2 |
+	t1 := stackFrame expression.
+	t2 := stackFrame pc.
+	t2 > t1 size
+		ifTrue: [self popStackFrame]
+		ifFalse: [stackFrame pc: t2 + 1.
+			self
+				pushStackFrame: (ScratchStackFrame
+						forExpression: (t1 at: t2))]! !
 
-	| blocks pc |
-	blocks _ stackFrame expression.
-	pc _ stackFrame pc.
-	pc > blocks size
-		ifTrue:	[self popStackFrame]
-		ifFalse:	[stackFrame pc: pc + 1.
-				self pushStackFrame: (ScratchStackFrame new expression: (blocks at: pc))].
-
-! !
-
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'DaveF 7/9/2003 11:20'!
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/16/2016 15:38'!
 evaluateSpecialForm
+	| |
 	"Evaluates the current special form expression.  Requires that no arguments have been evaluated, and that the current expression be a special form."
 
-	self perform: stackFrame expression selector.! !
+	(#(setVar:to: changeVar:by:) includes: (stackFrame expression selector)) ifTrue: [
+	#setVar:to: = (stackFrame expression selector) ifTrue: [^ self setVar].
+	#changeVar:by: = (stackFrame expression selector) ifTrue: [^ self changeVar].
+	].
+	self perform: stackFrame expression selector! !
 
-!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/5/2016 12:15'!
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:11'!
+evaluateSpecialForm: selector
+	| |
+	"Evaluates the current special form expression.  Requires that no arguments have been evaluated, and that the current expression be a special form."
+
+	(#(setVar:to: changeVar:by:) includes: (selector)) ifTrue: [
+	#setVar:to: = (selector) ifTrue: [^ self setVar].
+	#changeVar:by: = (selector) ifTrue: [^ self changeVar].
+	].
+	self perform: selector! !
+
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/26/2016 16:11'!
+numberOfArgumentsReady
+	^ stackFrame numberOfArgumentsReady! !
+
+!ScratchProcess methodsFor: 'private-evaluation' stamp: 'EMP 4/28/2016 15:20'!
 yield
-	"Sets a flag indicating that we're ready to yield to another process."
-
-	readyToYield _ true.
-	self popStackFrame.! !
+	readyToYield := true.
+	self popStackFrame! !
 
 
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 2/25/2016 16:33'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:11'!
 doAsk
-	"Ask the user a question and wait until the user types some text and hits the accept button."
-
-	| block args question prompter |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"first time (args size = 0): open prompter"
-	args size = 0
-		ifTrue: [
-			block receiver promptInProgress ifTrue: [
-				self pushStackFrame: (ScratchStackFrame new shouldYield: true).
-				^ self].
-			question _ block args first asString.
-			prompter _ block receiver promptForInput: question]
-		ifFalse: [
-			prompter _ args first].
-
-	"if all processes have stopped, pop this frame and we're done."
-	prompter isDone ifTrue: [^ self popStackFrame].
-
-	"Set up the wait loop. We need to:
-		1.  yield to another process
-		2.  evaluate the termination expression again
-	Push these onto stack in reverse order."
-
-	"2.  evaluate this block again"
-	"(Remove the current frame and replace it with one that will force the termination expression to be re-evaluated.)"
+	| t1 t2 |
+	t2 := stackFrame.
+	stackFrame numberOfArgumentsReady = 0
+		ifTrue: [stackFrame promptInProgress
+				ifTrue: [self pushStackFrame: ScratchStackFrameToYield new.
+					^ self].
+			t1 := stackFrame buildPrompter]
+		ifFalse: [t1 := t2 firstArg].
+	t1 isDone
+		ifTrue: [^ self popStackFrame].
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block; addArgument: prompter).
+	self
+		pushStackFrame: (t2 toEvaluateExpression addArgument: t1).
+	self pushStackFrame: ScratchStackFrameToYield new! !
 
-	"1.  yield to another process"
-	self isAtomic ifFalse: [
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 2/25/2016 16:34'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:43'!
 doBroadcastAndWait
-	"Broadcast an event and wait until all processes started by that broadcast have terminated."
-
-	| block args eventName stage procs |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"first time: send the event and collect a list of processes"
-	args size = 0
-		ifTrue: [
-			eventName _ block args first asString.
-			stage _ block receiver ownerThatIsA: ScratchStageMorph.
-			procs _ stage broadcastEventNamed: eventName with: 0]
-		ifFalse: [
-			procs _ args first].
-
-	"if all processes have stopped, pop this frame and we're done."
-	(procs select: [:p | p isRunning]) size = 0 ifTrue: [^ self popStackFrame].
-
-	"Set up the wait loop. We need to:
-		1.  yield to another process
-		2.  evaluate the termination expression again
-	Push these onto stack in reverse order."
-
-	"2.  evaluate this block again"
-	"(Remove the current frame and replace it with one that will force the termination expression to be re-evaluated.)"
+	| t1 t2 t3 t4 t5 |
+	t1 := stackFrame expression.
+	t2 := stackFrame arguments.
+	t2 size = 0
+		ifTrue: [t3 := t1 args first asString.
+			t4 := t1 receiver ownerOrYourselfThatIsA: ScratchStageMorph.
+			t5 := t4
+						broadcastEvent: (ScratchNamedEvent new name: t3)]
+		ifFalse: [t5 := t2 first].
+	(t5
+			select: [:t6 | t6 isRunning]) size = 0
+		ifTrue: [^ self popStackFrame].
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block; addArgument: procs).
+	self
+		pushStackFrame: ((ScratchStackFrame forExpression: t1)
+				addArgument: t5).
+	self pushStackFrame: ScratchStackFrameToYield new! !
 
-	"1.  yield to another process"
-	self isAtomic ifFalse: [
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 2/25/2016 16:34'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/28/2016 16:01'!
 doForLoop
 	"Handles one iteration of a forEach block"
 
-	| arguments block counter frame changerBlock |
+	| arguments block counter frame changerBlock toEvaluateExpression oldStackFrame |
 
 	block _ stackFrame expression.
 	arguments _ stackFrame arguments.
+	oldStackFrame _ stackFrame.
+	toEvaluateExpression _ stackFrame toEvaluateExpression.
 	"If we haven't done so yet, evaluate the argument to repeat."
-	arguments size < block argumentCount ifTrue: [isFirst _ true. ^ self evaluateNextArgument].
-	arguments _ block coerceArgs: arguments.
+	stackFrame needsMoreArgumentsEvaluated ifTrue: [isFirst _ true. ^ self evaluateNextArgument].
 
 	"If the number of times to repeat is 0, then we're done."
-	counter _ arguments second asNumberNoError.
-	counter <= 0 ifTrue:	[^ self popStackFrame].
+	counter _ stackFrame secondArg asNumberNoError.
+	counter < 1 ifTrue:	[^ self popStackFrame].
 
 	"Pop this instruction from the stack."
 	self popStackFrameNoUnhightlight.
 
+	"Find the changerBlock, or create one if needed"
+	oldStackFrame numberOfArgumentsReady < 3 ifTrue: [
+	changerBlock _ (SetterBlockMorph new
+	initChangerForVar: (arguments first asString); 
+	receiver: (block receiver)).
+	changerBlock expressionArg numExpression: '1'] ifFalse: [changerBlock _ oldStackFrame arguments third].
+
 	"At top of stack should now be:
-		(0. set the value to zero; only for the first iteration)
-		1. increment the variable
+		(0. set the value of the variable to zero; only for the first iteration)
+		1. increment the variable by 1
 		2.  evaluate body of repeat block.
 		3.  yield.
-		4.  evaluate repeat block with decremented counter value.
+		4.  evaluate for loop with decremented counter value.
 	Need to add these to the stack in reverse order."
 
+
 	"4.  evaluate repeat block with decremented counter value."
-	frame _ ScratchStackFrame new
-				expression:		block;
-				addArgument: (arguments first);
-				addArgument:	counter - 1.
+	frame _ toEvaluateExpression
+				addArgument: (oldStackFrame firstArg);
+				addArgument:	counter - 1;
+				addArgument: changerBlock.
 	self pushStackFrame: frame.
 
 	"3.  yield."
-	self isAtomic ifFalse: [self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
+	self isAtomic ifFalse: [self pushStackFrame: (ScratchStackFrameToYield new)].
 
 	"2.  evaluate body of repeat block."
 	self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList).
 
 	"1. increment the variable"
-	changerBlock _ (SetterBlockMorph new
-	initChangerForVar: (arguments first asString); 
-	receiver: (block receiver)).
-	changerBlock expressionArg numExpression: '1'.
-	self pushStackFrame: (ScratchStackFrame new expression: (Array with: changerBlock)).
+	self pushStackFrame: (ScratchStackFrame new expression: changerBlock).
 
 	isFirst = true ifTrue: [
 	changerBlock _ (SetterBlockMorph new
-	initSetterForVar: (arguments first asString); 
+	initSetterForVar: (oldStackFrame firstArg asString); 
 	receiver: (block receiver)).
-	changerBlock expressionArg numExpression: '0'.
-	self pushStackFrame: (ScratchStackFrame new expression: (Array with: changerBlock))].
+	changerBlock expressionArg numExpression: '1'.
+	self pushStackFrame: (ScratchStackFrame new expression: changerBlock)].
 	isFirst _ false.
 ! !
 
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 2/25/2016 16:34'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/27/2016 12:31'!
 doForever
-	"Executes one iteration of a forever loop."
+	| t1 |
+	t1 := stackFrame.
+	(self isAtomic) ifFalse: [
+	self pushStackFrame: ScratchStackFrameToYield new].
+	self pushStackFrame: t1 toEvaluateFirstBlockList! !
 
-	"Right now, the forever special form is at the top of the stack.  We're going to add two more things on top of this:  (1) a frame for evaluating the blocks in the forever block, and (2) a frame that just results in yielding control.  That way we'll evaluate the contents of the block, give up control, and do it all again."
-
-	| blocks |
-
-	"Remember blocks to evaluate before we clobber the stack."
-	blocks _ stackFrame expression firstBlockList.	
-
-	"When we're all done with these blocks, we want to yield."
-	self isAtomic ifFalse: [
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-
-	"First, we want to evaluate the blocks inside the loop."
-	self pushStackFrame: (ScratchStackFrame new expression: blocks).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 2/25/2016 16:35'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/28/2016 15:42'!
 doForeverIf
-	"Executes one iteration of a forever if loop."
-
-	| block args |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"evaluate the condition if we haven't yet"
-	args size < 1 ifTrue: [^ self evaluateNextArgument].
-
-	"remove the current frame and replace it with one that will force the test expression to be re-evaluated."
+	| t1 |
+	t1 := stackFrame.
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block).
-	self isAtomic ifTrue: [
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true)]. "yield after possibly running body"
+	self pushStackFrame: t1 toEvaluateExpression.
+	(self isAtomic) ifFalse: [
+	self pushStackFrame: ScratchStackFrameToYield new].
+	t1 firstArg asBoolean
+		ifTrue: [self pushStackFrame: t1 toEvaluateFirstBlockList]! !
 
-	"if the condition was true, run the body"
-	args first ifTrue: [
-		self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList)].
-
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/6/2016 11:57'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/28/2016 15:42'!
 doIf
-	"Evaluate the current expression (which must be an if)."
-
-	| block arguments argExp |
-
-	block _ stackFrame expression.
-	arguments _ stackFrame arguments.
-
-	"Evaluate the arg if we haven't already."
-	arguments size = 0
-		ifTrue:	[argExp _ block argumentAt: 1.
-				^self pushStackFrame: (ScratchStackFrame new expression: argExp)].
-
-	"We can pop this expression off the stack either way."
+	| t1 |
+	t1 := stackFrame.
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
 	self popStackFrame.
+	t1 firstArg asBoolean
+		ifFalse: [^ self].
+	self pushStackFrame: t1 toEvaluateFirstBlockList! !
 
-	"If the predicate was false, just return."
-	arguments first asBoolean
-		ifFalse: [^self].
-
-	"Since the predicate was true, evaluate the body of the if."
-	self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList).! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/5/2016 16:16'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/28/2016 15:42'!
 doIfElse
-	"Evaluate the current expression (which must be an if-then-else)."
-
-	| block arguments argExp |
-	block _ stackFrame expression.
-	arguments _ stackFrame arguments.
-
-	"evaluate the arg if we haven't already."
-	arguments size = 0 ifTrue: [
-		argExp _ block argumentAt: 1.
-		^ self pushStackFrame: (ScratchStackFrame new expression: argExp)].
-
-	"we can pop this expression off the stack either way"
+	| t1 |
+	t1 := stackFrame.
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
 	self popStackFrame.
+	t1 firstArg asBoolean
+		ifTrue: [self pushStackFrame: t1 toEvaluateTrueBlockList]
+		ifFalse: [self pushStackFrame: t1 toEvaluateFalseBlockList]! !
 
-	(arguments first asBoolean)
-		ifTrue: [self pushStackFrame: (ScratchStackFrame new expression: block trueBlockList)]
-		ifFalse: [self pushStackFrame: (ScratchStackFrame new expression: block falseBlockList)].
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'jm 5/5/2007 17:04'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/27/2016 12:31'!
 doPlaySoundAndWait
-	"Play a sound and block until it has finished playing."
-
-	| block args soundName snd |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"first time: send the event and collect a list of processes"
-	args size = 0
-		ifTrue: [
-			soundName _ block args first.
-			snd _ block receiver soundNamed: soundName ifAbsent: [^ self popStackFrame].
-			snd playFromStart]
-		ifFalse: [
-			snd _ args first].
-
-	"if sound has stopped, pop this frame and we're done"
-	snd isPlaying ifFalse: [^ self popStackFrame].
-
-	"Set up the wait loop. We need to:
-		1.  yield to another process
-		2.  evaluate our termination condition again
-	Push these onto stack in reverse order."
-
-	"2.  evaluate this block again"
-	"(Remove the current frame and replace it with one that will force the termination condition to be re-evaluated.)"
+	| t1 t2 |
+	t2 := stackFrame.
+	stackFrame numberOfArgumentsReady = 0
+		ifTrue: [(t1 := stackFrame startSoundCommand)
+				ifNil: [^ self popStackFrame]]
+		ifFalse: [t1 := stackFrame firstArg].
+	t1 isPlaying
+		ifFalse: [^ self popStackFrame].
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new
-		expression: block;
-		addArgument: snd).
+	self
+		pushStackFrame: (t2 toEvaluateExpression addArgument: t1).
+	(self isAtomic) ifFalse: [
+	self pushStackFrame: ScratchStackFrameToYield new].! !
 
-	"1.  yield to another process"
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 12/12/2015 12:57'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/28/2016 15:41'!
 doRepeat
-	"Handles one iteration of a repeat block."
-
-	| arguments argExp block counter frame |
-
-	block _ stackFrame expression.
-	arguments _ stackFrame arguments.
-
-	"If we haven't done so yet, evaluate the argument to repeat."
-	arguments size < 1
-		ifTrue:	[argExp _ block argumentAt: 1.
-				^self pushStackFrame: (ScratchStackFrame new expression: argExp)].
-
-	"If the number of times to repeat is 0, then we're done."
-	counter _ arguments first asNumberNoError.
-	counter <= 0 ifTrue:	[^ self popStackFrame].
-
-	"Pop this instruction from the stack."
+	| t1 t2 t3 |
+	t1 := stackFrame.
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
+	t2 := stackFrame firstArg asNumberNoError.
+	t2 < 1
+		ifTrue: [^ self popStackFrame].
 	self popStackFrameNoUnhightlight.
+	t3 := t1 toEvaluateExpression addArgument: t2 - 1.
+	self pushStackFrame: t3.
+	(self isAtomic) ifFalse: [
+	self pushStackFrame: ScratchStackFrameToYield new].
+	self pushStackFrame: t1 toEvaluateFirstBlockList! !
 
-	"At top of stack should now be:
-		1.  evaluate body of repeat block.
-		2.  yield.
-		3.  evaluate repeat block with decremented counter value.
-	Need to add these to the stack in reverse order."
-
-	"3.  evaluate repeat block with decremented counter value."
-	frame _ ScratchStackFrame new
-				expression:		block;
-				addArgument:	counter - 1.
-	self pushStackFrame: frame.
-
-	"2.  yield."
-	self isAtomic ifFalse: [self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-
-	"1.  evaluate body of repeat block."
-	self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'jm 3/22/2005 11:17'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:12'!
 doReturn
-	"Evaluates its argument, and returns the value to the frame from which the current method was called."
+	stackFrame needsMoreArgumentsEvaluated
+		ifTrue: [^ self evaluateNextArgument].
+	answer
+		ifNil: [answer := ''].
+	[stackFrame isNil]
+		whileFalse: [self popStackFrame]! !
 
-	| value args |
-
-	args _ stackFrame arguments.
-
-	"Evaluate the argument, if necessary."
-	args size < stackFrame expression argumentCount
-		ifTrue: [^self evaluateNextArgument].
-
-	"Remember the return value."
-	args size > 0
-		ifTrue:	[value _ args first]
-		ifFalse:	[value _ nil].
-
-	"Pop until we're out of frames to pop, or we hit a return marker."
-
-	[stackFrame isNil] whileFalse:
-		[self popStackFrame].
-
-	stackFrame ifNotNil:	[
-		self returnValueToParentFrame: value.
-		self popStackFrame].
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'DaveF 7/25/2003 11:15'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:13'!
 doUntil
-	"Evaluates the current until-loop expression."
+	^ self doUntil: true! !
 
-	^self doUntil: true.! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 12/12/2015 12:58'!
-doUntil: terminatingBoolean
-	"Evaluates the current while or until loop expression until the loop condition evaluates to the boolean terminating value."
-
-	| args block |
-
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"Evaluate the condition if we haven't yet."
-	args size < 1
-		ifTrue: [^self evaluateNextArgument].
-
-	"If the condition matches the terminatingBoolean, pop this frame and we're done."
-	args first = terminatingBoolean ifTrue: [^self popStackFrame].
-
-	"Set up for an iteration of the while loop.  We need to:
-		1.  evaluate the body
-		2.  yield to another process
-		3.  evaluate the while/until block again
-	Push these onto stack in reverse order."
-
-	"3.  evaluate the while/until block again"
-	"(We remove the current frame and replace it with one that will force the argument to be re-evaluated.)"
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:13'!
+doUntil: t1 
+	| t2 |
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
+	stackFrame firstArg = t1
+		ifTrue: [^ self popStackFrame].
+	t2 := stackFrame.
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block).
+	self pushStackFrame: t2 toEvaluateExpression.
+	self pushStackFrame: ScratchStackFrameToYield new.
+	self pushStackFrame: t2 toEvaluateFirstBlockList! !
 
-	"2.  yield to another process"
-	self isAtomic ifFalse: [self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-	
-	"1.  evaluate the body"
-	self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'jm 1/22/2007 13:09'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/27/2016 12:31'!
 doWaitUntil
-	"Evaluates the the wait condition until it evaluates to true."
-
-	| block args |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"evaluate the termination expression if we haven't yet."
-	args size < 1 ifTrue: [^ self evaluateNextArgument].
-
-	"if the termination condition is met, pop this frame and we're done."
-	args first ifTrue: [^ self popStackFrame].
-
-	"Set up for waitUntil loop. We need to:
-		1.  yield to another process
-		2.  evaluate the termination expression again
-	Push these onto stack in reverse order."
-
-	"2.  evaluate this block again"
-	"(Remove the current frame and replace it with one that will force the termination expression to be re-evaluated.)"
+	| t1 |
+	stackFrame numberOfArgumentsReady < 1
+		ifTrue: [^ self evaluateNextArgument].
+	stackFrame firstArg
+		ifTrue: [^ self popStackFrame].
+	t1 := stackFrame.
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block).
+	self pushStackFrame: t1 toEvaluateExpression.
+	(self isAtomic) ifFalse: [
+	self pushStackFrame: ScratchStackFrameToYield new].! !
 
-	"1.  yield to another process"
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'DaveF 7/25/2003 11:14'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:13'!
 doWhile
-	"Evaluates the current while-loop expression."
+	^ self doUntil: false! !
 
-	^self doUntil: false.! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 12/12/2015 11:25'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:13'!
 startSceneAndWait
-	"Broadcast an event and wait until all processes started by that broadcast have terminated."
-
-	| block args eventName stage procs |
-	block _ stackFrame expression.
-	args _ stackFrame arguments.
-
-	"first time: send the event and collect a list of processes"
-	args size = 0
-		ifTrue: [
-			eventName _ block args first asString.
-			stage _ block receiver ownerThatIsA: ScratchStageMorph.
-			procs _ stage broadcastEventNamed: 'Scratch-BackDropChanged' with: eventName]
-		ifFalse: [
-			procs _ args first].
-
-	"if all processes have stopped, pop this frame and we're done."
-	(procs select: [:p | p isRunning]) size = 0 ifTrue: [^ self popStackFrame].
-
-	"Set up the wait loop. We need to:
-		1.  yield to another process
-		2.  evaluate the termination expression again
-	Push these onto stack in reverse order."
-
-	"2.  evaluate this block again"
-	"(Remove the current frame and replace it with one that will force the termination expression to be re-evaluated.)"
+	| t1 t2 t3 t4 t5 |
+	t1 := stackFrame expression.
+	t2 := stackFrame arguments.
+	t2 size = 0
+		ifTrue: [t3 := t1 args first asString.
+			t4 := t1 receiver ownerOrYourselfThatIsA: ScratchStageMorph.
+			t5 := t4
+						broadcastEvent: (ScratchBackdropChangedEvent bgName: t3)]
+		ifFalse: [t5 := t2 first].
+	(t5
+			select: [:t6 | t6 isRunning]) size = 0
+		ifTrue: [^ self popStackFrame].
 	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block; addArgument: procs).
+	self
+		pushStackFrame: ((ScratchStackFrame forExpression: t1)
+				addArgument: t5).
+	self pushStackFrame: ScratchStackFrameToYield new! !
 
-	"1.  yield to another process"
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true).
-! !
-
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 12/8/2015 19:52'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/26/2016 16:13'!
 stopScripts
-	"Evaluates its argument, and returns the value to the frame from which 
-	the current method was called."
-	| value args stage |
-	args _ stackFrame arguments.
-	"Evaluate the argument, if necessary."
-	args size < stackFrame expression argumentCount ifTrue: [^ self evaluateNextArgument].
-	"Remember the return value."
-	args size > 0
-		ifTrue: [value _ args first]
-		ifFalse: [value _ nil].
-	value = 'this script'
-		ifTrue: 
-			["Pop until we're out of frames to pop, or we hit a return 
-			marker. "
-			[stackFrame isNil]
+	| t1 t2 t3 |
+	stackFrame needsMoreArgumentsEvaluated
+		ifTrue: [^ self evaluateNextArgument].
+	t2 := stackFrame arguments.
+	t2 size > 0
+		ifTrue: [t1 := t2 first]
+		ifFalse: [t1 := nil].
+	t1 = 'this script'
+		ifTrue: [[stackFrame isNil]
 				whileFalse: [self popStackFrame].
 			stackFrame
-				ifNotNil: 
-					[self returnValueToParentFrame: value.
+				ifNotNil: [self returnValueToParentFrame: t1.
 					self popStackFrame].
+			answer
+				ifNil: [answer := ''].
 			^ self].
-	value = 'all'
-		ifTrue: 
-			[stage _ stackFrame expression receiver ownerThatIsA: ScratchStageMorph.
-			stage ifNotNil: [stage stopAll].
+	t1 = 'all'
+		ifTrue: [t3 := stackFrame expression receiver ownerThatIsA: ScratchStageMorph.
+			t3
+				ifNotNil: [t3 stopAll].
 			self stop.
+			answer
+				ifNil: [answer := ''].
 			^ self].
-	value = 'other scripts in sprite' ifTrue: [(stackFrame expression receiver blocksBin submorphs) do: [:m | ((m isKindOf: BlockMorph) and: [m ~= topBlock]) ifTrue: [m stop]]. self popStackFrame.
-	^ self].
-
+	t1 = 'other scripts in sprite'
+		ifTrue: [stackFrame expression receiver blocksBin submorphs
+				do: [:t4 | ((t4 isKindOf: BlockMorph)
+							and: [t4 ~= topBlock])
+						ifTrue: [t4 clearProcess]].
+			self popStackFrame.
+			^ self].
+	t1 = 'other scripts in stage'
+		ifTrue: [stackFrame expression receiver blocksBin submorphs
+				do: [:t4 | ((t4 isKindOf: BlockMorph)
+							and: [t4 ~= topBlock])
+						ifTrue: [t4 clearProcess]].
+			self popStackFrame.
+			^ self].
 	^ self error: 'Again... stopScripts.'! !
 
-!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 12/12/2015 12:58'!
+!ScratchProcess methodsFor: 'private-special forms' stamp: 'EMP 4/29/2016 14:31'!
 warpSpeed
-	"Handles one iteration of a repeat block."
-
-	| block |
-
-	block _ stackFrame expression.
-
-
-	"Pop this instruction from the stack."
+	| t1 |
+	t1 := stackFrame.
 	self popStackFrameNoUnhightlight.
-
-	"At top of stack should now be:
-		1.  evaluate the body of the all at once block.
-	Need to add these to the stack in reverse order."
-
-
-	"1.  evaluate body of repeat block."
-	self pushStackFrame: (ScratchStackFrame new expression: block firstBlockList).
-! !
+	t1 expression firstBlockList isEmpty ifFalse: [
+	atomicityList add: true.
+	self pushStackFrame: ScratchStackFrameToYield new.
+	self
+		pushStackFrame: (ScratchStackFrameToPerform selector: #closeAtomic).
+	self pushStackFrame: t1 toEvaluateFirstBlockList]! !
 
 
-!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 12/12/2015 13:01'!
+!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 4/28/2016 14:57'!
 popStackFrame
-	"Pops the current stack frame off the top of the stack, so that the next one becomes the current frame."
+	| t1 |
+	t1 := stackFrame.
+	stackFrame := stackFrame parentFrame.
+	self isAtomic ifFalse: [
+	BlockHighlightMSecs > 0
+		ifTrue: [t1 needsUnlighting
+				ifTrue: [self pushStackFrame: t1 toUnlightExpression]]]! !
 
-	| command frame unlightFrame |
-
-	frame _ stackFrame.
-	stackFrame _ stackFrame parentFrame.
-
-	command _ frame expression.
-
-	self isAtomic ifTrue: [^ self].
-
-	BlockHighlightMSecs > 0 ifTrue: [
-		(frame shouldUnlight not and: [command isKindOf: BlockMorph]) ifTrue: [
-			"We push a new frame for unlighting this command."
-			unlightFrame _ ScratchStackFrame new
-				expression: command;
-				shouldUnlight: true.
-			self pushStackFrame: unlightFrame]].
-! !
-
-!ScratchProcess methodsFor: 'private-stack' stamp: 'jm 1/22/2007 13:12'!
+!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 4/26/2016 16:13'!
 popStackFrameNoUnhightlight
-	"Pops the current stack frame off the top of the stack, so that the next one becomes the current frame. Do not add a stack frame to unhighlight this block. Use this method when a block will re-evaluated, such 'wait until'."
+	stackFrame := stackFrame parentFrame! !
 
-	stackFrame _ stackFrame parentFrame.
+!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 4/26/2016 16:13'!
+pushStackFrame: t1 
+	t1 parentFrame: stackFrame.
+	stackFrame := t1! !
 
-! !
-
-!ScratchProcess methodsFor: 'private-stack' stamp: 'jm 3/23/2005 09:06'!
-pushStackFrame: aScratchStackFrame
-	"Pushes the given new stack frame onto the top of the stack, so that it becomes the current stack frame."
-
-	aScratchStackFrame parentFrame: stackFrame.
-	stackFrame _ aScratchStackFrame.
-! !
-
-!ScratchProcess methodsFor: 'private-stack' stamp: 'jm 8/13/2003 17:40'!
-returnValueToParentFrame: anObject
-	"Append the given object to the argument list of my parent frame."
-
-	| f |
-	stackFrame ifNil: [^ self].
-	f _ stackFrame parentFrame.
-	[f notNil and: [f shouldUnlight]] whileTrue: [
-		f _ f parentFrame].
-	f ifNotNil: [f addArgument: anObject].
-! !
+!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 4/26/2016 16:13'!
+returnValueToParentFrame: t1 
+	| t2 |
+	stackFrame
+		ifNil: [^ self].
+	t2 := stackFrame parentFrame.
+	[t2 notNil
+		and: [t2 shouldUnlight]]
+		whileTrue: [t2 := t2 parentFrame].
+	t2
+		ifNotNil: [t2 addArgument: t1]! !
 
 !ScratchProcess methodsFor: 'private-stack' stamp: 'DaveF 7/9/2003 18:26'!
 stackAsArray
@@ -844,68 +538,115 @@ stackAsArray
 
 	^collection asArray! !
 
+!ScratchProcess methodsFor: 'private-stack' stamp: 'EMP 4/26/2016 16:13'!
+stackFromFrame: t1 upwardsDo: t2 
+	| t3 |
+	t3 := t1.
+	[t3 isNil]
+		whileFalse: [t2 value: t3.
+			t3 := t3 parentFrame]! !
 
-!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/5/2016 15:54'!
+
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/16/2016 12:46'!
+bindStopBlocksIn: t1 to: t2 
+	t1 do: [:t3 | t3
+			allMorphsDo: [:t4 | ((t4 isKindOf: CommandBlockMorph)
+					and: [t4 selector = #stopScripts or: [t4 selector = #report]])
+					ifTrue: [t4 stopFrame: t2]]]! !
+
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/28/2016 15:18'!
 call
-	| block args proc blockArgs scriptReceiver |
+	| block lambda argsList script varsFrame params iLimiT stopFrame |
+	self isAtomic.
 	block _ stackFrame expression.
-	args _ stackFrame arguments.
+	stackFrame arguments size < block argumentCount ifTrue: [^ self evaluateNextArgument].
 
-	stackFrame expression isReporter ifTrue: [^ self callReporter].
+	lambda _ block.
+	argsList _ stackFrame arguments.
+	script _ (lambda procedure ifNil: [^ self popStackFrame]) blockSequence allButFirst collect: [:m | m fullCopy].
+	atomicityList ifNil: [atomicityList _ OrderedCollection new].
+	atomicityList add: lambda isAtomic.
+	blockVarList ifNil: [blockVarList _ OrderedCollection new].
+	blockVarList add: (VariableFrame forNames: lambda allVarNames).
+	varsFrame _ blockVarList last.
+	params _ block allVarNames.
+	params size > 0
+		ifTrue: 
+			[iLimiT _ argsList size.
+			(1 to: iLimiT)
+				do: [:i | argsList size >= i ifTrue: [varsFrame setVar: (params at: i)
+							to: (argsList at: i)]]].
+	scriptList ifNil: [scriptList _ OrderedCollection new].
+	scriptList add: script.
 
-	args size = 0 ifTrue: [
-	blockArgs _ block args.
-	scriptReceiver _ block receiver.
-	proc _ ((scriptReceiver procedure: block commandSpec withArgs: blockArgs)) scriptArgs: (blockArgs).
-	] ifFalse: [
-	proc _ args first.
-	].
+	stopFrame _ ScratchStackFrameToPerform selector: #closeCustomBlock.
+	self pushStackFrame: stopFrame.
+	self bindStopBlocksIn: script to: stopFrame.
+	self pushStackFrame: (ScratchStackFrame new expression: (script , {(CommandBlockMorph new commandSpec: '%s'; selector: #report; isSpecialForm: true; receiver: (block receiver); argPermutation: {1})}))! !
 
-	(proc isKindOf: Array) ifTrue: [answer _ ''. self returnValueToParentFrame: nil. ^ self popStackFrame].
-	proc isRunning ifFalse: [answer _ proc answer. self returnValueToParentFrame: answer. ^ self popStackFrame].
-
-	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block; addArgument: proc).
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true).
-! !
-
-!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/6/2016 12:00'!
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/28/2016 15:18'!
 callReporter
-	| block args proc blockArgs scriptReceiver |
+	| block lambda argsList script varsFrame params iLimiT stopFrame |
+	self isAtomic.
 	block _ stackFrame expression.
-	args _ stackFrame arguments.
-	args size < stackFrame expression argumentCount
-		ifTrue: [^self evaluateNextArgument].
+	stackFrame arguments size < block argumentCount ifTrue: [^ self evaluateNextArgument].
 
-	(args size = (stackFrame expression argumentCount + 1)) ifFalse: [
-	blockArgs _ args.
-	scriptReceiver _ block receiver.
-	proc _ ((scriptReceiver procedure: block commandSpec withArgs: blockArgs)) scriptArgs: (blockArgs).
-	args add: proc.
-	] ifTrue: [
-	proc _ args last.
-	].
+	lambda _ block.
+	argsList _ stackFrame arguments.
+	script _ (lambda procedure ifNil: [^ self popStackFrame]) blockSequence allButFirst collect: [:m | m fullCopy].
+	atomicityList ifNil: [atomicityList _ OrderedCollection new].
+	atomicityList add: lambda isAtomic.
+	blockVarList ifNil: [blockVarList _ OrderedCollection new].
+	blockVarList add: (VariableFrame forNames: lambda allVarNames).
+	varsFrame _ blockVarList last.
+	params _ block allVarNames.
+	params size > 0
+		ifTrue: 
+			[iLimiT _ argsList size.
+			(1 to: iLimiT)
+				do: [:i | argsList size >= i ifTrue: [varsFrame setVar: (params at: i)
+							to: (argsList at: i)]]].
+	scriptList ifNil: [scriptList _ OrderedCollection new].
+	scriptList add: script.
 
-	(proc isKindOf: Array) ifTrue: [answer _ ''. self returnValueToParentFrame: nil. ^ self popStackFrame].
-	proc isRunning ifFalse: [answer _ proc answer. self returnValueToParentFrame: answer. ^ self popStackFrame].
+	stopFrame _ ScratchStackFrameToPerform selector: #closeCustomBlock.
+	self pushStackFrame: stopFrame.
+	self bindStopBlocksIn: script to: stopFrame.
+	self pushStackFrame: (ScratchStackFrame new expression: (script , {(CommandBlockMorph new commandSpec: '%s'; selector: #report; isSpecialForm: true; receiver: (block receiver); argPermutation: {1})}))! !
 
-	self popStackFrameNoUnhightlight.
-	self pushStackFrame: (ScratchStackFrame new expression: block; arguments: args; yourself).
-	self isAtomic ifFalse: [
-	self pushStackFrame: (ScratchStackFrame new shouldYield: true)].
-! !
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/16/2016 15:48'!
+changeVar
+	| t1 t2 |
+	t1 _ stackFrame expression.
+	t2 _ stackFrame arguments.
+		t2 size < 2 ifTrue: 
+			[^ self evaluateNextArgument].
 
-!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/5/2016 16:14'!
+	(t1 receiver) changeVar: (t2 first) by: (t2 second).
+	self popStackFrame! !
+
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/28/2016 14:56'!
+closeCustomBlock
+	blockVarList
+		ifNotNil: [blockVarList size > 0
+				ifTrue: 
+					[blockVarList removeLast.
+					atomicityList removeLast.
+					scriptList removeLast]].
+	stackFrame ifNotNil: [self isAtomic ifTrue: [self popStackFrameNoUnhightlight] ifFalse: [self popStackFrame]].! !
+
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/27/2016 16:05'!
 getArgumentOrNil: selector
-	^ scriptVars at: selector asByteArray asString ifAbsent: [nil].! !
+	blockVarList ifNil: [^ 0].
+	^ blockVarList last getVar: selector asByteArray asString! !
 
-!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 2/25/2016 16:31'!
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/28/2016 15:21'!
 isAtomic
 	| t1 t2 |
 	t2 _ World findA: ScratchPresenterMorph.
 	t2 notNil
 		ifTrue: [t1 _ t2 buttons third bounds]
-		ifFalse: [t1 _ ScratchFrameMorph allInstances first stopButton bounds].
+		ifFalse: [t1 _(World findA: ScratchFrameMorph) stopButton bounds].
 	(Sensor anyButtonPressed and: [t1 containsPoint: Sensor cursorPoint])
 		ifTrue: 
 			[self stop.
@@ -917,30 +658,48 @@ isAtomic
 			Preferences noviceMode ifFalse: [Display flash: t1].
 			^ false].
 	((Time primMillisecondClock) > ci) ifTrue: [ci _ Time primMillisecondClock + 500. World displayWorldSafely].
-	^ (topBlock isKindOf: ProcedureHatBlockMorph) and: [topBlock isAtomic]! !
+	atomicityList ifNil: [^ false].
+	atomicityList size = 0 ifTrue: [^ false].
+	Sensor flushKeyboard.
+	^ atomicityList last or: [BlockHighlightMSecs = 0]! !
 
-!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/5/2016 16:04'!
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/27/2016 15:19'!
 report
-	| t1 t3 |
-	"If we haven't done so already, evaluate the argument to be reported back to the end-user"
-	stackFrame arguments size < stackFrame expression argumentCount
-		ifTrue:	[^ self evaluateNextArgument].
+	"Evaluates its argument, and returns the value to the frame from which the current method was called."
 
-	t1 _ stackFrame arguments first asString.
-	answer _ t1.
-	t3 _ 
-			[[stackFrame isNil or: [stackFrame expression = #closeCustomBlock]]
-				whileFalse: [self popStackFrame].
-			stackFrame ifNotNil: [self popStackFrame]].
-	t3 value.
-	[stackFrame notNil
-		and: [stackFrame parentFrame notNil and: [stackFrame parentFrame expression = #shouldYield]]]
-		whileTrue: 
-			[t3 value.
-			t3 value].
-	self returnValueToParentFrame: t1.
-	stackFrame ifNotNil: [self popStackFrame].
-	readyToTerminate _ true.! !
+	| value args zap |
+
+	args _ stackFrame arguments.
+
+	"Evaluate the argument, if necessary."
+
+	stackFrame needsMoreArgumentsEvaluated
+		ifTrue: [^self evaluateNextArgument].
+
+
+	"Remember the return value."
+	args size > 0
+		ifTrue:	[value _ args first]
+		ifFalse:	[value _ nil].
+	answer _ value. 
+
+	zap _ [
+		[ stackFrame isNil
+		or: [stackFrame expression = #closeCustomBlock]] whileFalse: [ 
+			self popStackFrame]. self closeCustomBlock].
+
+	zap value.
+
+
+	[stackFrame notNil 
+	and: [stackFrame parentFrame notNil 
+	and: [stackFrame parentFrame shouldYield]]] whileTrue: [
+		zap value. zap value ].
+
+	self returnValueToParentFrame: value.
+
+	stackFrame ifNotNil: [ self popStackFrame ].
+! !
 
 !ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/5/2016 16:08'!
 scriptArgs: aDictionary
@@ -949,6 +708,17 @@ scriptArgs: aDictionary
 	scriptVars _ Dictionary new.
 	argNames _ (topBlock findArgs).
 	argNames do: [:arg | scriptVars at: arg asByteArray asString put: (aDictionary at: (argNames indexOf: arg))].! !
+
+!ScratchProcess methodsFor: 'private-custom blocks' stamp: 'EMP 4/16/2016 15:41'!
+setVar
+	| t1 t2 |
+	t1 _ stackFrame expression.
+	t2 _ stackFrame arguments.
+	t2 size < 2 ifTrue: 
+			[^ self evaluateNextArgument].
+
+	(t1 receiver) setVar: (t2 first) to: (t2 second).
+	self popStackFrame! !
 
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
@@ -973,6 +743,11 @@ blockHighlightMSecs: aNumber
 
 	BlockHighlightMSecs _ aNumber.
 ! !
+
+
+!ScratchProcess class methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:14'!
+forBlock: t1 
+	^ self new forBlock: t1! !
 
 
 ScratchProcess initialize!

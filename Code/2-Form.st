@@ -135,6 +135,10 @@ getCanvas
 height
 	^ height! !
 
+!Form methodsFor: 'accessing' stamp: 'EMP 4/27/2016 13:50'!
+isForm
+	^ true! !
+
 !Form methodsFor: 'accessing' stamp: 'ar 2/16/2000 22:00'!
 offset
 	^offset ifNil:[0@0]! !

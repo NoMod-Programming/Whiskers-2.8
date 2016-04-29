@@ -216,7 +216,7 @@ mouseUp: evt
 
 ! !
 
-!ScratchPresenterMorph methodsFor: 'event handling' stamp: 'jm 3/2/2009 15:39'!
+!ScratchPresenterMorph methodsFor: 'event handling' stamp: 'EMP 4/26/2016 16:28'!
 processKeyboardEvents
 
 	| prompter evt ch |
@@ -230,7 +230,7 @@ processKeyboardEvents
 					prompter dispatchKeyStroke: evt]
 				ifNil: [
 					(ch = 3) | (ch = 13) ifTrue: [^ self shoutGo].
-					stage broadcastEventNamed: 'Scratch-KeyPressedEvent' with: evt]]].
+					stage broadcastEvent: (ScratchKeypressEvent for: evt)]]].
 ! !
 
 !ScratchPresenterMorph methodsFor: 'event handling' stamp: 'EMP 4/12/2016 13:47'!

@@ -59,11 +59,11 @@ isAlphaNumeric
 
 	^self isLetter or: [self isDigit]! !
 
-!Character methodsFor: 'testing' stamp: 'EMP 2/11/2016 14:30'!
+!Character methodsFor: 'testing' stamp: 'EMP 4/26/2016 15:31'!
 isDigit
 	"Answer whether the receiver is a digit."
 
-	^value >= 46 and: [value <= 57]! !
+	^(value >= 48 and: [value <= 57]) or: [value = 46]! !
 
 !Character methodsFor: 'testing'!
 isLetter

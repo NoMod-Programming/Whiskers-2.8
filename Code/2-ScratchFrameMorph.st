@@ -987,6 +987,10 @@ exportSprite
 	scriptsPane target exportObject.
 ! !
 
+!ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'EMP 4/29/2016 14:54'!
+fibbonaci
+	^  {{10@286. {{#callReporter. '  %n th fibbonaci number'. 12}}}. {10@13. {{#procDef. 'fibbonaci  %n   %n   %n '. {'number1'. 'number2'. 'iteration'}. {'10'. '10'. '10'}. false}. {#doIf. {#=. {#getParam. 'iteration'. #r}. '0'}. {{#report. {#getParam. 'number1'. #r}}}}. {#report. {#callReporter. 'fibbonaci  %n   %n   %n '. {#getParam. 'number2'. #r}. {#+. {#getParam. 'number1'. #r}. {#getParam. 'number2'. #r}}. {#-. {#getParam. 'iteration'. #r}. 1}}}}}. {10@186. {{#procDef. '  %n th fibbonaci number'. {'number1'}. {'10'}. true}. {#report. {#callReporter. 'fibbonaci  %n   %n   %n '. 0. 1. {#getParam. 'number1'. #r}}}}}}! !
+
 !ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'EMP 12/3/2015 15:35'!
 fileMenu: aMenuTitleMorph
 
@@ -1375,17 +1379,6 @@ shareMenu: aMenuTitleMorph
 
 ! !
 
-!ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'jm 8/3/2008 13:52'!
-shoutGo
-	"Broadcasts the start event to all objects and processes."
-
-	self stopAll.
-	workPane broadcastEventNamed: 'Scratch-StartClicked' with: 0.
-	flagButton on.
-	World displayWorldSafely.  "force button flash"
-	Delay waitMSecs: 20.
-! !
-
 !ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'jm 3/26/2009 22:21'!
 showMotorBlocks
 
@@ -1466,34 +1459,45 @@ surpriseSpriteMorph
 	m referencePosition: ((e x negated) to: e x) atRandom @ ((e y negated) to: e y) atRandom.
 ! !
 
-!ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'EMP 4/12/2016 13:49'!
-tipsScreens: blank
-
-	| menu sprite blocks x y |
-	Sensor shiftPressed ifTrue: [
-	menu _ CustomMenu new.
-	menu title: 'WHISKERS BETA MENU
+!ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'EMP 4/29/2016 14:41'!
+tipsScreens: blank 
+	| menu sprite blocks x y t |
+	Sensor shiftPressed
+		ifTrue: 
+			[menu _ CustomMenu new.
+			menu title: 'WHISKERS BETA MENU
 This is for testing features, and beta features'.
-	menu add: 'Backwards compliant special features' action: #backwardsSpecial.
-	menu add: 'Create a project with ALL blocks' action: #allBlocks.
-	(menu startUp) caseOf: {
-	[#backwardsSpecial] -> [
-	ScratchSettings at: #backwardsSpecial put: ((ScratchSettings at: #backwardsSpecial) not).
-	].
-	[#allBlocks] -> [
-	self newScratchProject.
-	sprite _ (ScratchFrameMorph allInstances first) workPane firstSubmorph.
-	blocks _ #().
-	#('events' 'control' 'motion' 'motor' 'looks' 'pen' 'operators' 'sound' 'sensing' 'variables' 'list' 'more blocks' 'obsolete') do: [:m | blocks _ blocks, (sprite blocksFor: m)].
-	x _ 12.
-	y _ 0.
-	sprite blocksBin: ((blocks select: [:m | m isKindOf: BlockMorph]) collect: [:m | {x@(y _ y + m height + 10). {m asBlockTuple}.}]).
-	sprite convertTuplesToStacks.
+			fillScreenFlag ifFalse: [
+			menu add: 'Backwards compliant special features' action: #backwardsSpecial.
+			menu add: 'Create a project with ALL blocks' action: #allBlocks.
+			menu add: 'Get picture of stage' action: #stagePic.
+			menu add: 'Get picture of scratch' action: #scratchPic.
+			menu addLine].
+			menu add: 'Fibbonaci test' action: #fibTest.
+			menu startUp caseOf: {
+				[#backwardsSpecial] -> [ScratchSettings at: #backwardsSpecial put: (ScratchSettings at: #backwardsSpecial) not].
+				[#allBlocks] -> 
+					
+					[self newScratchProject.
+					sprite _ ScratchFrameMorph allInstances first workPane firstSubmorph.
+					blocks _ #().
+					#('events' 'control' 'motion' 'motor' 'looks' 'pen' 'operators' 'sound' 'sensing' 'variables' 'list' 'more blocks' 'obsolete' ) do: [:m | blocks _ blocks , (sprite blocksFor: m)].
+					x _ 12.
+					y _ 10.
+					sprite blocksBin: ((blocks select: [:m | m isKindOf: BlockMorph])
+							collect: [:m | t _ {x @ y. {m asBlockTuple}}. (y _ y + m height + 10). t]).
+					sprite convertTuplesToStacks.
+					sprite blocksBin cleanUp].
+				[#stagePic] -> [(ImageMorph new form: (Display copy: workPane bounds)) openInWorld].
+				[#scratchPic] -> [(ImageMorph new form: (Display copy: self bounds)) openInWorld].
+				[#fibTest] -> [self newScratchProject.
+				sprite _ ScratchFrameMorph allInstances first workPane firstSubmorph.
+				sprite blocksBin: self fibbonaci.
+				sprite convertTuplesToStacks]
 
-
-	].
-	} otherwise: [].
-] ifFalse: [TipsDialog ask: ('select a category' localized)]! !
+				}
+				otherwise: []]
+		ifFalse: [TipsDialog ask: 'select a category' localized]! !
 
 !ScratchFrameMorph methodsFor: 'menu/button actions' stamp: 'jm 9/29/2003 23:19'!
 toggleErrorCatcher
@@ -1893,7 +1897,7 @@ processDroppedFiles
 					ifFalse: [m importMedia: fName]]].
 ! !
 
-!ScratchFrameMorph methodsFor: 'stepping' stamp: 'jm 12/9/2008 23:01'!
+!ScratchFrameMorph methodsFor: 'stepping' stamp: 'EMP 4/26/2016 16:27'!
 processKeyboardEvents
 
 	| evt ch |
@@ -1911,7 +1915,7 @@ processKeyboardEvents
 					Smalltalk fullScreenMode: true.
 					World restoreDisplay].
 				^ self].
-			workPane broadcastEventNamed: 'Scratch-KeyPressedEvent' with: evt]].
+			workPane broadcastEvent: (ScratchKeypressEvent for: evt)]].
 ! !
 
 !ScratchFrameMorph methodsFor: 'stepping' stamp: 'jm 5/20/2009 16:59'!
@@ -2306,7 +2310,7 @@ projectModified
 	justSaved _ false.
 ! !
 
-!ScratchFrameMorph methodsFor: 'other' stamp: 'EMP 2/11/2016 14:21'!
+!ScratchFrameMorph methodsFor: 'other' stamp: 'EMP 4/29/2016 12:33'!
 saveImageForEndUser
 
 	| screenExtent |
@@ -2329,6 +2333,7 @@ image in end-user (fillScreen) mode?') ifFalse: [^ self].
 			self extent: screenExtent].
 	World doOneCycleNow.
 	self startup.
+	ScriptableScratchMorph initialize.
 	Sensor useOSEvents: true.
 ! !
 
@@ -2454,7 +2459,7 @@ setDefaultSprite
 			^ self]].
 ! !
 
-!ScratchFrameMorph methodsFor: 'startup' stamp: 'EMP 11/24/2015 10:47'!
+!ScratchFrameMorph methodsFor: 'startup' stamp: 'EMP 4/27/2016 15:52'!
 startup
 
 	| startupFileNames fileName arg presentationMode |
@@ -3369,6 +3374,14 @@ normalTool
 	self world activeHand toolType: nil.
 ! !
 
+!ScratchFrameMorph methodsFor: 'tools (no longer used)' stamp: 'EMP 4/27/2016 12:45'!
+shoutGo
+	self stopAll.
+	workPane broadcastEvent: ScratchStartClickEvent new.
+	flagButton on.
+	World displayWorldSafely.
+	World cycleWhileWaitingMSecs: 20 doInput: true doSteps: true! !
+
 !ScratchFrameMorph methodsFor: 'tools (no longer used)' stamp: 'jm 1/23/2007 12:51'!
 undoTool
 
@@ -3976,7 +3989,7 @@ showWatcher: watcher
 ! !
 
 
-!ScratchFrameMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/6/2016 12:20'!
+!ScratchFrameMorph methodsFor: 'version control' stamp: 'EMP 4/6/2016 12:20'!
 versionControlExport
 	"Outputs all classes that have changed since the project start date to a directory that should be managed by an external revision control system."
 
@@ -3987,7 +4000,7 @@ versionControlExport
 	
 	dir fileOutClassesChangedSince: date.! !
 
-!ScratchFrameMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/6/2016 12:19'!
+!ScratchFrameMorph methodsFor: 'version control' stamp: 'EMP 4/6/2016 12:19'!
 versionControlImport
 	"Updates the classes in the Squeak VM by importing them from a 'Classes' directory that should be managed by your revision control system."
 
@@ -4707,10 +4720,10 @@ versionControlExport
 	
 	dir fileOutClassesChangedSince: date.! !
 
-!ScratchFrameMorph class methodsFor: 'as yet unclassified' stamp: 'EMP 4/6/2016 12:22'!
+!ScratchFrameMorph class methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 15:32'!
 versionControlStartDate
 	"Only classes that have changed since this date will be exported to the revision control system"
-	^ '07 01 2015' asDate! !
+	^ '07/01/2015' asDate! !
 
 
 ScratchFrameMorph initialize!

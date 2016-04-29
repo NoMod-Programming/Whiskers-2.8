@@ -57,7 +57,7 @@ sourceQuad: pts destRect: aRectangle
 ! !
 
 
-!WarpBlt methodsFor: 'primitives' stamp: 'bf 5/11/2012 17:23'!
+!WarpBlt methodsFor: 'primitives' stamp: 'EMP 4/27/2016 13:51'!
 warpBitsSmoothing: n sourceMap: sourceMap
 
 	| deltaP12 deltaP43 pA pB deltaPAB sp fixedPtOne picker poker pix nSteps |
@@ -120,7 +120,8 @@ warpBitsSmoothing: n sourceMap: sourceMap
 										destMap: colorMap)].
 			sp _ sp + deltaPAB].
 		pA _ pA + deltaP12.
-		pB _ pB + deltaP43]! !
+		pB _ pB + deltaP43]
+! !
 
 
 !WarpBlt methodsFor: 'private-simulation'!
@@ -473,7 +474,7 @@ rotate: srcForm degrees: angleInDegrees scaleBy: scalePoint smoothing: cellSize
 	^ dstForm
 ! !
 
-!WarpBlt class methodsFor: 'form rotation' stamp: 'EMP 11/23/2015 15:50'!
+!WarpBlt class methodsFor: 'form rotation' stamp: 'EMP 4/18/2016 12:56'!
 scale: srcForm by: scalePoint smoothing: cellSize
 	"Rotate the given Form the given number of degrees about the given center and scale its width and height by x and y of the given scale point. Smooth using the given cell size, an integer between 1 and 3, where 1 means no smoothing. Answer the rotated Form. Note that the dimensions of the resulting Form generally differ from those of the original."
 

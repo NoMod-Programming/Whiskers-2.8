@@ -110,6 +110,13 @@ storeOn: aStream
 
 	self printOn: aStream! !
 
+
+!Boolean methodsFor: '*jsbridge-core' stamp: 'bf 11/25/2014 18:12'!
+asJSArgument
+	"converted to JS true/false by plugin"
+	^self
+! !
+
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 Boolean class

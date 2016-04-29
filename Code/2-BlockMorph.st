@@ -204,6 +204,10 @@ hasComment
 	^ self commentMorph notNil
 ! !
 
+!BlockMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:20'!
+hasDeletedReceiver
+	^ false! !
+
 !BlockMorph methodsFor: 'accessing' stamp: 'jm 3/2/2005 12:37'!
 helpScreenName
 	"Answer the name of the help screen for this block, or nil if no help is available."
@@ -378,6 +382,13 @@ showErrorFeedback
 	self changed.
 ! !
 
+!BlockMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:06'!
+stopProcess
+	scratchProc
+		ifNotNil: [self changed.
+			scratchProc stop.
+			scratchProc := nil]! !
+
 
 !BlockMorph methodsFor: 'block enumerating' stamp: 'jm 12/8/2002 19:22'!
 blockSequence
@@ -441,7 +452,7 @@ tupleSequence
 ! !
 
 
-!BlockMorph methodsFor: 'drawing' stamp: 'jm 3/30/2005 07:32'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/17/2016 10:31'!
 computeHighlightColors
 
 	| h s v |
@@ -450,34 +461,37 @@ computeHighlightColors
 	v _ color brightness.
 	highlightColor1 _ Color h: h s: (s - 0.13) v: (v + 0.1).
 	highlightColor2 _ Color h: h s: s v: (v + 0.07).
-	shadowColor _ color mixed: 0.7 with: Color black.
-! !
+	shadowColor _ color mixed: 0.7 with: Color black.! !
 
-!BlockMorph methodsFor: 'drawing' stamp: 'EMP 1/7/2016 10:40'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/22/2016 14:22'!
 drawBodyOn: aCanvas 
 
 
 	aCanvas 
 		fillRectangle: (self left@(self top+5) corner: (self left + 1)@(self bottom - 7))
-		color: color slightlyLighter slightlyLighter.
-	aCanvas
-		fillRectangle: ((self left + 1)@(self top + 5) corner: (self left + 2)@(self bottom - 7))
-		color: color slightlyLighter.
+		color: (Color white mixed: 0.13 with: color).
+	aCanvas 
+		fillRectangle: ((self left + 1) @(self top+5) corner: (self left + 2)@(self bottom - 7))
+		color: (Color white mixed: 0.06 with: color).
 
 	aCanvas
-		fillRectangle: (self left + 2@(self top + 5) corner: (self right - 2)@(self bottom - 7))
+		fillRectangle: ((self left + 2)@(self top + 5) corner: (self right - 2)@(self bottom - 7))
 		color: color.
 	
 	aCanvas
-		fillRectangle: ((self right - 2)@(self top + 3) corner: (self right - 1)@(self bottom - 7))
-		color: color .
+		fillRectangle: ((self right - 3)@(self top + 3) corner: (self right - 1)@(self bottom - 7))
+		color: color.
 
 	aCanvas
 		fillRectangle: ((self right - 1)@(self top + 3) corner: (self right)@(self bottom - 7))
-		color: color.
+		color: (Color black mixed: 0.30 with: color).
+	aCanvas
+		fillRectangle: ((self right - 2)@(self top + 3) corner: (self right - 1)@(self bottom - 7))
+		color: (Color black mixed: 0.15 with: color).
+
 ! !
 
-!BlockMorph methodsFor: 'drawing' stamp: 'EMP 11/24/2015 14:52'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/22/2016 14:23'!
 drawBottomEdgeOn: aCanvas
 
 	| right y gapStart gapEnd |
@@ -487,43 +501,53 @@ drawBottomEdgeOn: aCanvas
 	gapEnd _ PuzzleInset + PuzzleWidth.
 
 
-	self drawHLineFrom: 0 to: right y: y color: color on: aCanvas.
-
-	y + y + 1.
-
-	self drawHLineFrom: 0 to: right y: y color: color on: aCanvas.
+	self drawHLineFrom: 3 to: gapStart y: y color: color on: aCanvas.
+	self drawHLineFrom: gapStart to: gapEnd y: y color: color on: aCanvas.
+	self drawHLineFrom: gapEnd to: right - 2 y: y color: color on: aCanvas.
+	self drawPoint: (0@y) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (1@y) color: (Color white mixed: 0.06 with: color) on: aCanvas.
+	self drawPoint: (2@y) color: color on: aCanvas.
+	self drawPoint: (right@y) color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawPoint: (right - 1@y) color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (right - 2@y) color: color on: aCanvas.
 
 	y _ y + 1.
-
-	self drawHLineFrom: 1 to: gapStart y: y color: color slightlyDarker on: aCanvas.
+	self drawHLineFrom: 4 to: gapStart y: y color: (Color black mixed: 0.15 with: color) on: aCanvas.
 	self drawHLineFrom: gapStart to: gapEnd y: y color: color on: aCanvas.
-	self drawHLineFrom: gapEnd to: right - 1 y: y color: color slightlyDarker on: aCanvas.
+	self drawHLineFrom: gapEnd to: right - 3 y: y color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (1@y) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (2@y) color: (Color white mixed: 0.06 with: color) on: aCanvas.
+	self drawPoint: (3@y) color: color on: aCanvas.
+	self drawPoint: (right - 1@y) color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawPoint: (right - 2@y) color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (right - 3@y) color: color on: aCanvas.
 
-	self drawHLineFrom: 2 to: right - 2 y: y + 1 color: color slightlyDarker slightlyDarker on: aCanvas.
-	self drawHLineFrom: gapStart + 1 to: gapEnd - 1 y: y + 1 color: color on: aCanvas.
-	self drawHLineFrom: gapEnd - 1 to: right - 2 y: y + 1 color: color slightlyDarker slightlyDarker on: aCanvas.
+	y _ y + 1.
+	self drawHLineFrom: 5 to: gapStart y: y color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawHLineFrom: gapStart to: gapEnd y: y color: color on: aCanvas.
+	self drawHLineFrom: gapEnd to: right - 2 y: y color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawPoint: (2@y) color: ((Color black mixed: 0.3 with: color) mixed: 0.5 with: (Color white mixed: 0.13 with: color)) on: aCanvas.
+	self drawPoint: (3@y) color: ((Color black mixed: 0.15 with: color) mixed: 0.5 with: (Color white mixed: 0.06 with: color)) on: aCanvas.
+	self drawPoint: (4@y) color: color on: aCanvas.
+	self drawPoint: (right - 2@y) color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawPoint: (right - 3@y) color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (right - 4@y) color: color on: aCanvas.
 
-	self drawHLineFrom: gapStart to: gapStart + 1 y: y + 2 color: color slightlyLighter on: aCanvas.
-	self drawHLineFrom: gapStart + 1 to: gapEnd - 1 y: y + 2 color: color on: aCanvas.
-	self drawHLineFrom: gapEnd - 1 to: gapEnd y: y + 1 color: color slightlyDarker on: aCanvas.
+	y _ y + 1.
+	self drawHLineFrom: gapStart to: gapEnd y: y color: color on: aCanvas.
+	self drawPoint: (gapStart - 1@y) color: ((Color black mixed: 0.3 with: color) mixed: 0.5 with: (Color white mixed: 0.13 with: color)) on: aCanvas.
+	self drawPoint: (gapEnd@y) color: ((Color black mixed: 0.15 with: color) mixed: 0.5 with: (Color white mixed: 0.06 with: color)) on: aCanvas.
 
-	self drawHLineFrom: gapStart + 1 to: gapStart + 2 y: y + 3 color: color slightlyLighter on: aCanvas.
-	self drawHLineFrom: gapStart + 2 to: gapEnd - 2 y: y + 3 color: color on: aCanvas.
-	self drawHLineFrom: gapEnd - 2 to: gapEnd - 1 y: y + 3 color: color slightlyDarker on: aCanvas.
+	y _ y + 1.
+	self drawHLineFrom: gapStart + 1 to: gapEnd - 1 y: y color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (gapStart@y) color: ((Color black mixed: 0.3 with: color) mixed: 0.5 with: (Color white mixed: 0.13 with: color)) on: aCanvas.
+	self drawPoint: (gapEnd - 1@y) color: ((Color black mixed: 0.15 with: color) mixed: 0.5 with: (Color white mixed: 0.06 with: color)) on: aCanvas.
 
-	self drawHLineFrom: gapStart + 2 to: gapStart + 3 y: y + 4 color: color slightlyLighter on: aCanvas.
-	self drawHLineFrom: gapStart + 3 to: gapEnd - 3 y: y + 4 color: color slightlyDarker on: aCanvas.
-	self drawHLineFrom: gapEnd - 3 to: gapEnd - 2 y: y + 4 color: color darker on: aCanvas.
-
-	self drawHLineFrom: gapStart + 3 to: gapStart + 4 y: y + 5 color: color slightlyLighter on: aCanvas.
-	self drawHLineFrom: gapStart + 4 to: gapEnd - 4 y: y + 5 color: color darker on: aCanvas.
-	self drawHLineFrom: gapEnd - 4 to: gapEnd - 3 y: y + 5 color: color darker slightlyDarker on: aCanvas.
+	y _ y + 1.
+	self drawHLineFrom: gapStart + 1 to: gapEnd - 1 y: y color: (Color black mixed: 0.3 with: color) on: aCanvas.
 
 
-	"A few cleanups because of a bug..."
-	self drawPoint: (gapEnd - 1)@(y + 2) color: color on: aCanvas.
-
-"OLD:
+	true ifTrue: [^ self].
 	self drawHLineFrom: 1 to: right - 1 y: y color: color on: aCanvas.
 	self drawHLineFrom: 2 to: right - 2 y: y + 1 color: color on: aCanvas.
 
@@ -546,7 +570,6 @@ drawBottomEdgeOn: aCanvas
 
 	self drawPoint: (right - 1)@y color: shadowColor on: aCanvas.
 	self drawPoint: (right - 2)@(y + 1) color: shadowColor on: aCanvas.
-	"
 ! !
 
 !BlockMorph methodsFor: 'drawing' stamp: 'ee 7/1/2008 15:02'!
@@ -617,20 +640,21 @@ drawReporterBodyOn: aCanvas
 		color: shadowColor.
 ! !
 
-!BlockMorph methodsFor: 'drawing' stamp: 'jm 3/30/2005 07:31'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/22/2016 14:25'!
 drawSmoothBottomEdgeOn: aCanvas
 
 	| right y |
 	right _ self width - 1.
 	y _ self height - 3.
+	self drawHLineFrom: 1 to: right - 2 y: y color: color on: aCanvas.
+	self drawHLineFrom: 2 to: right - 2 y: y + 1 color: (Color black mixed: 0.06 with: color) on: aCanvas.
+	self drawHLineFrom: 3 to: right - 2 y: y + 2 color: (Color black mixed: 0.13 with: color) on: aCanvas.
 
-	self drawHLineFrom: 1 to: right - 1 y: y color: color on: aCanvas.
-	self drawHLineFrom: 2 to: right - 2 y: y + 1 color: color on: aCanvas.
-	self drawHLineFrom: 3 to: right - 2 y: y + 2 color: shadowColor on: aCanvas.
+	self drawPoint: (right - 1)@y color: (Color black mixed: 0.3 with: color) on: aCanvas.
+	self drawPoint: (right - 2)@(y + 1) color: (Color black mixed: 0.3 with: color) on: aCanvas.
 
-	self drawPoint: (right - 1)@y color: shadowColor on: aCanvas.
-	self drawPoint: (right - 2)@(y + 1) color: shadowColor on: aCanvas.
-! !
+	self drawPoint: (right - 1)@(y - 1) color: (Color black mixed: 0.15 with: color) on: aCanvas.
+	self drawPoint: (right - 2)@(y) color: (Color black mixed: 0.15 with: color) on: aCanvas.! !
 
 !BlockMorph methodsFor: 'drawing' stamp: 'jm 3/26/2005 12:12'!
 drawSmoothTopEdgeOn: aCanvas
@@ -643,23 +667,29 @@ drawSmoothTopEdgeOn: aCanvas
 	self drawHLineFrom: 0 to: right y: 2 color: color on: aCanvas.
 ! !
 
-!BlockMorph methodsFor: 'drawing' stamp: 'jm 4/15/2007 19:40'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/22/2016 10:33'!
 drawStopBodyOn: aCanvas 
 
 	aCanvas
-		fillRectangle: (self left@(self top + 5) corner: (self right - 1)@(self bottom - 3))
+		fillRectangle: ((self left + 2)@(self top + 5) corner: (self right - 2)@(self bottom - 3))
 		color: color.
 
-	aCanvas
-		fillRectangle: (self left@(self top + 2) corner: (self left + 2)@(self bottom - 3))
-		color: highlightColor2.
+	aCanvas 
+		fillRectangle: (self left@(self top + 5) corner: (self left + 1)@(self bottom - 3)) 
+		color: (Color white mixed: 0.13 with: color).
+	aCanvas 
+		fillRectangle: ((self left + 1)@(self top + 5) corner: (self left + 2)@(self bottom - 3)) 
+		color: (Color white mixed: 0.06 with: color).
 
-	aCanvas
-		fillRectangle: ((self right - 1)@(self top + 2) corner: self right@(self bottom - 3))
-		color: shadowColor.
+	aCanvas 
+		fillRectangle: ((self right - 1)@(self top + 5) corner: (self right)@(self bottom - 3)) 
+		color: (Color black mixed: 0.13 with: color).
+	aCanvas 
+		fillRectangle: ((self right - 2)@(self top + 5) corner: (self right - 1)@(self bottom - 3)) 
+		color: (Color black mixed: 0.06 with: color).
 ! !
 
-!BlockMorph methodsFor: 'drawing' stamp: 'EMP 11/24/2015 14:44'!
+!BlockMorph methodsFor: 'drawing' stamp: 'EMP 4/22/2016 14:26'!
 drawTopEdgeOn: aCanvas
 
 	| right gapStart gapEnd |
@@ -667,24 +697,38 @@ drawTopEdgeOn: aCanvas
 	gapStart _ PuzzleInset.
 	gapEnd _ PuzzleInset + PuzzleWidth.
 
-	"What we need to do to draw it like 2.0 is to create a ''Gradient'' of colors to use in drawing"
+	self drawHLineFrom: 2 to: gapStart - 1 y: 0 color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawHLineFrom: gapEnd + 1 to: right - 2 y: 0 color: (Color white mixed: 0.13 with: color) on: aCanvas.
 
-	self drawHLineFrom: 2 to: gapStart y: 0 color: (color mixed: 0.85 with: (Color white)) on: aCanvas.
-	self drawHLineFrom: gapEnd to: right - 2 y: 0 color: (color mixed: 0.85 with: (Color white)) on: aCanvas.
-	
-	self drawHLineFrom: 1 to: gapStart + 1 y: 1 color: (color mixed: 0.90 with: (Color white)) on: aCanvas.
-	self drawHLineFrom: gapEnd - 1 to: right - 1 y: 1 color: (color mixed: 0.90 with: (Color white)) on: aCanvas.
+	self drawHLineFrom: 2 to: gapStart y: 1 color: (Color white mixed: 0.07 with: color) on: aCanvas.
+	self drawHLineFrom: gapEnd to: right - 2 y: 1 color: (Color white mixed: 0.07 with: color) on: aCanvas.
 
-	self drawHLineFrom: 0 to: gapStart + 2 y: 2 color: (color mixed: 0.95 with: (Color white)) on: aCanvas.
-	self drawHLineFrom: gapEnd - 2 to: right y: 2 color: (color mixed: 0.95 with: (Color white)) on: aCanvas.
+	self drawHLineFrom: 1 to: gapStart + 1 y: 2 color: color on: aCanvas.
+	self drawHLineFrom: gapEnd - 1 to: right - 1 y: 2 color: color on: aCanvas.
 
+	self drawHLineFrom: 3 to: right - 2 y: 3 color: color on: aCanvas.
+	self drawHLineFrom: 3 to: right - 2 y: 4 color: color on: aCanvas.
 
-	self drawHLineFrom: 0 to: gapStart + 3 y: 3 color: color on: aCanvas.
-	self drawHLineFrom: gapEnd - 3 to: right y: 3 color: color on: aCanvas.
+	self drawPoint: (1@1) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (right - 2 @ 1) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (0@2) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (right - 1@2) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (0@4) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (0@3) color: (Color white mixed: 0.13 with: color) on: aCanvas.
+	self drawPoint: (1@4) color: (Color white mixed: 0.06 with: color) on: aCanvas.
+	self drawPoint: (1@3) color: (Color white mixed: 0.06 with: color) on: aCanvas.
+	self drawPoint: (2@4) color: color on: aCanvas.
+	self drawPoint: (2@3) color: color on: aCanvas.
+	self drawPoint: (2@4) color: color on: aCanvas.
+	self drawPoint: (1@2) color: (Color white mixed: 0.06 with: color) on: aCanvas.
+	self drawPoint: (right@4) color: ((Color white mixed: 0.13 with: color) mixed: 0.5 with: (Color black mixed: 0.3 with: color)) on: aCanvas.
+	self drawPoint: (right - 1@4) color: ((Color white mixed: 0.06 with: color) mixed: 0.5 with: (Color black mixed: 0.15 with: color)) on: aCanvas.
+	self drawPoint: (right - 2@4) color: color on: aCanvas.
+	self drawPoint: (right@3) color: ((Color white mixed: 0.13 with: color) mixed: 0.5 with: (Color black mixed: 0.3 with: color)) on: aCanvas.
+	self drawPoint: (right - 1@3) color: ((Color white mixed: 0.06 with: color) mixed: 0.5 with: (Color black mixed: 0.15 with: color)) on: aCanvas.
+	self drawPoint: (right - 2@3) color: color on: aCanvas.
 
-	self drawHLineFrom: 0 to: right y: 4 color: color on: aCanvas.
-	self drawHLineFrom: gapStart + 4 to: gapEnd - 4 y: 4 color: color slightlyLighter slightlyLighter on: aCanvas.
-	"OLD:
+	true ifTrue: [^ self].
 	self drawHLineFrom: 2 to: gapStart y: 0 color: highlightColor1 on: aCanvas.
 	self drawHLineFrom: gapEnd to: right - 2 y: 0 color: highlightColor1 on: aCanvas.
 
@@ -699,7 +743,6 @@ drawTopEdgeOn: aCanvas
 
 	self drawHLineFrom: 0 to: right y: 4 color: color on: aCanvas.
 	self drawHLineFrom: gapStart + 2 to: gapEnd - 2 y: 4 color: highlightColor1 on: aCanvas.
-	"
 ! !
 
 
@@ -1034,7 +1077,7 @@ handlesMouseDown: evt
 	^ true
 ! !
 
-!BlockMorph methodsFor: 'event handling' stamp: 'jm 11/27/2007 16:03'!
+!BlockMorph methodsFor: 'event handling' stamp: 'EMP 4/29/2016 14:04'!
 mouseDown: evt
 	"Handle a mouse click. Left button either drags or performs click action. Right button brings up a menu."
 
@@ -1050,18 +1093,19 @@ mouseHold: evt
 	self rightButtonMenu.
 ! !
 
-!BlockMorph methodsFor: 'event handling' stamp: 'jm 10/25/2007 19:04'!
+!BlockMorph methodsFor: 'event handling' stamp: 'EMP 4/13/2016 15:38'!
 rightButtonMenu
 
 	| menu |
 	menu _ CustomMenu new.
-	menu add: 'help' action: #presentHelpScreen.
 
 	(owner isKindOf: ScratchBlockPaletteMorph) ifFalse: [
-		menu addLine.
 		menu add: 'duplicate' action: #duplicate.	
 		(self owner isKindOf: BlockMorph) ifFalse: [  "we can't yet delete a blocks inside a script"
-			menu add: 'delete' action: #delete]].
+			menu add: 'delete' action: #delete].
+		menu addLine.
+		menu add: 'add comment' action: #addComment].
+	menu add: 'help' action: #presenthelpscreen.
 
 	DebugMenu ifTrue: [
 		menu addLine.
@@ -1105,6 +1149,25 @@ clearProcess
 
 	scratchProc ifNotNil: [self scratchProc: nil].
 ! !
+
+!BlockMorph methodsFor: 'processes' stamp: 'EMP 4/28/2016 15:47'!
+evaluateIn: t1 
+	| t2 |
+	((ScratchProcess blockHighlightMSecs > 1) & (t1 isAtomic not))
+		ifTrue: [self litUp: true].
+	self isSpecialForm
+		ifTrue: [t1 evaluateSpecialForm: self selector.
+			^ false].
+	(t2 := t1 numberOfArgumentsReady) < self argumentCount
+		ifTrue: [t1
+				pushStackFrame: (ScratchStackFrame
+						forExpression: (self argumentAt: t2 + 1)).
+			^ false].
+	self isTimed
+		ifTrue: [t1 applyTimedCommand.
+			^ false].
+	t1 applyPrimitive.
+	^ true! !
 
 !BlockMorph methodsFor: 'processes' stamp: 'jm 6/4/2009 13:01'!
 hasRunningProcess
@@ -1177,6 +1240,13 @@ storeFieldsOn: anObjStream
 	) on: anObjStream.
 ! !
 
+
+!BlockMorph methodsFor: 'private' stamp: 'EMP 4/13/2016 15:50'!
+addComment
+	| sb comment |
+	sb _ (self ownerThatIsA: ScratchScriptsMorph) ifNil: [^ self].
+	sb addMorph: (comment _ ScratchCommentMorph new anchor: self).
+	comment updatePosition! !
 
 !BlockMorph methodsFor: 'private' stamp: 'jm 8/24/2003 17:03'!
 attachBlock: aBlockMorph

@@ -314,3 +314,10 @@ pushArgs: args from: sendr
 	args do: [:arg | self push: arg].
 	sender _ sendr.
 	pc _ startpc! !
+
+
+!BlockContext methodsFor: '*jsbridge-core' stamp: 'bf 11/25/2014 18:12'!
+asJSArgument
+	"converted to JS function by plugin"
+	^self
+! !

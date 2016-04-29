@@ -245,7 +245,7 @@ fullDrawOn: aCanvas
 		rule: Form blend.
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:00'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:28'!
 lookLike: costumeName
 	"Change to the costume with the given name. Noop if there is no costume of the given name in my library."
 
@@ -253,9 +253,8 @@ lookLike: costumeName
 	hPan _ 0.
 	vPan _ 0.
 	super lookLike: costumeName.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: (self backgroundIndex)).
-
-! !
+	self	broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'looks ops' stamp: 'jm 6/18/2004 18:16'!
 makeVisible
@@ -275,14 +274,14 @@ newScene
 			m recordScene: sceneName]].
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:00'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:29'!
 nextBackground
 	"Show the next background in my backgrounds list."
 
 	self nextCostume.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: (self backgroundIndex)).
-
-! !
+		self
+		broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'looks ops' stamp: 'nb 1/7/2008 14:19'!
 rerecordScene
@@ -341,13 +340,14 @@ setZoomTo: percent
 	self changed.
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:01'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:29'!
 showBackground: costumeNameOrIndex
 	"This is lookLike: for the stage..."
 
 	self lookLike: costumeNameOrIndex.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: costumeNameOrIndex).
-! !
+		self
+		broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'looks ops' stamp: 'nb 1/7/2008 12:52'!
 showScene: sceneName
@@ -782,13 +782,29 @@ allEventNames
 	^ result asArray sort
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 2/14/2008 18:23'!
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:30'!
+broadcastEvent: aScratchEvent
+	"Broadcast a ScratchEvent with given name and argument value to all Scratch objects and answer a collection of the newly created processes. This is done by finding all public scripts that respond to this event, and starting new processes for any not already running."
+
+	| objList newProcs |
+	newProcs _ OrderedCollection new.
+
+	"start scripts"
+	objList _ submorphs select: [:m | m isKindOf: ScriptableScratchMorph].
+	objList do: [:obj |
+		newProcs addAll: (obj eventReceived: aScratchEvent)].
+	newProcs addAll: (self eventReceived: aScratchEvent).
+
+	^ newProcs asArray
+! !
+
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:26'!
 broadcastEventNamed: name with: value
 	"Broadcast a ScratchEvent with given name and argument value to all Scratch objects and answer a collection of the newly created processes. This is done by finding all public scripts that respond to this event, and starting new processes for any not already running."
 
 	| event objList newProcs |
 	scratchServer ifNotNil: [scratchServer queueBroadcast: name].
-	event _ ScratchEvent new name: name argument: value.
+	event _ ScratchNamedEvent new name: name.
 	newProcs _ OrderedCollection new.
 
 	"start scripts"
@@ -839,26 +855,13 @@ removeTerminatedProcesses
 	runningBlocks _ newRunning.
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 6/4/2009 12:27'!
-startProcessFor: topBlock
-	"Start a process to run the given block or stack of blocks. Return the new process."
-
-	| sequence proc |
-	sequence _ topBlock blockSequence.
-	sequence first isHatBlock ifTrue: [
-		sequence _ sequence allButFirst].  "skip hat block"
-
-	topBlock scratchProc ifNotNil: [topBlock stop].
-
-	proc _ ScratchProcess new
-		topBlock: topBlock;
-		expression: sequence.
-	topBlock scratchProc: proc.
-
-	(runningBlocks includes: topBlock) ifFalse: [runningBlocks addLast: topBlock].
-
-	^ proc
-! !
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:14'!
+startProcessFor: t1 
+	| t2 |
+	t2 := ScratchProcess forBlock: t1.
+	(runningBlocks includes: t1)
+		ifFalse: [runningBlocks addLast: t1].
+	^ t2! !
 
 !ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 12/12/2008 14:08'!
 stepProcesses
@@ -885,7 +888,7 @@ stepProcesses
 	inProcessStep _ false.
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 10/21/2015 15:41'!
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/27/2016 12:17'!
 stepProcessesTurbo
 	"Run each Scratch process until it gives up control, then filter out any processes that have terminated. Do this repeatedly until time is up."
 
@@ -894,14 +897,13 @@ stepProcessesTurbo
 	inProcessStep ifTrue: [^ self].
 	inProcessStep _ true.
 
-	startMSecs _ Time millisecondClockValue.
-	[
-		[now _ Time millisecondClockValue.
+	startMSecs _ Time millisecondClockValue	.
+	
+		[[now _ Time millisecondClockValue.
 		 runningBlocks size > 0 and:
 		  [(now >= startMSecs) and: [(now - startMSecs) < sliceMSecs]]] whileTrue: [
 			self processesToRun do: [:p | (proc _ p) runStepFor: self].
-			self removeTerminatedProcesses].
-	] ifError: [(proc stackFrame expression isKindOf: Array) ifTrue: [proc errorFlagImmediate: true. proc stackFrame expression first showError. proc stackFrame expression first topBlock showErrorFeedback] ifFalse: [proc errorFlag: true]].
+			self removeTerminatedProcesses]] ifError: [proc errorFlag: true].
 
 	inProcessStep _ false.
 ! !
@@ -977,7 +979,7 @@ allClones
 		(m isKindOf: ScriptableScratchMorph) and: [m isClone]].
 ! !
 
-!ScratchStageMorph methodsFor: 'clones' stamp: 'EMP 10/5/2015 11:56'!
+!ScratchStageMorph methodsFor: 'clones' stamp: 'EMP 4/26/2016 16:45'!
 createCloneOf: anObject
 	"Clone this sprite and send the clone (and only the clone) the given message."
 
@@ -992,7 +994,7 @@ createCloneOf: anObject
 		(m isKindOf: BlockMorph) ifTrue: [m stop]].
 
 	frame workPane addMorph: clone.
-	clone eventReceived: (ScratchEvent new name: 'Scratch-StartedAsClone' argument: 1).
+	clone eventReceived: (ScratchClonedEvent new).
 ! !
 
 !ScratchStageMorph methodsFor: 'clones' stamp: 'jm 6/6/2008 14:41'!
@@ -1409,13 +1411,29 @@ backgroundIndex
 	^ self costumeIndex
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 2/14/2008 18:23'!
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:30'!
+broadcastEvent: aScratchEvent
+	"Broadcast a ScratchEvent with given name and argument value to all Scratch objects and answer a collection of the newly created processes. This is done by finding all public scripts that respond to this event, and starting new processes for any not already running."
+
+	| objList newProcs |
+	newProcs _ OrderedCollection new.
+
+	"start scripts"
+	objList _ submorphs select: [:m | m isKindOf: ScriptableScratchMorph].
+	objList do: [:obj |
+		newProcs addAll: (obj eventReceived: aScratchEvent)].
+	newProcs addAll: (self eventReceived: aScratchEvent).
+
+	^ newProcs asArray
+! !
+
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:26'!
 broadcastEventNamed: name with: value
 	"Broadcast a ScratchEvent with given name and argument value to all Scratch objects and answer a collection of the newly created processes. This is done by finding all public scripts that respond to this event, and starting new processes for any not already running."
 
 	| event objList newProcs |
 	scratchServer ifNotNil: [scratchServer queueBroadcast: name].
-	event _ ScratchEvent new name: name argument: value.
+	event _ ScratchNamedEvent new name: name.
 	newProcs _ OrderedCollection new.
 
 	"start scripts"
@@ -1498,7 +1516,7 @@ costumeChanged
 	self changed.
 ! !
 
-!ScratchStageMorph methodsFor: 'clones' stamp: 'EMP 10/5/2015 11:56'!
+!ScratchStageMorph methodsFor: 'clones' stamp: 'EMP 4/26/2016 16:45'!
 createCloneOf: anObject
 	"Clone this sprite and send the clone (and only the clone) the given message."
 
@@ -1513,7 +1531,7 @@ createCloneOf: anObject
 		(m isKindOf: BlockMorph) ifTrue: [m stop]].
 
 	frame workPane addMorph: clone.
-	clone eventReceived: (ScratchEvent new name: 'Scratch-StartedAsClone' argument: 1).
+	clone eventReceived: (ScratchClonedEvent new).
 ! !
 
 !ScratchStageMorph methodsFor: 'pen support' stamp: 'jm 2/11/2005 21:56'!
@@ -1933,7 +1951,7 @@ isQuarterSize: aBoolean
 	isQuarterSize _ aBoolean.
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:00'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:28'!
 lookLike: costumeName
 	"Change to the costume with the given name. Noop if there is no costume of the given name in my library."
 
@@ -1941,9 +1959,8 @@ lookLike: costumeName
 	hPan _ 0.
 	vPan _ 0.
 	super lookLike: costumeName.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: (self backgroundIndex)).
-
-! !
+	self	broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'looks ops' stamp: 'jm 6/18/2004 18:16'!
 makeVisible
@@ -1997,14 +2014,14 @@ newScene
 			m recordScene: sceneName]].
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:00'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:29'!
 nextBackground
 	"Show the next background in my backgrounds list."
 
 	self nextCostume.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: (self backgroundIndex)).
-
-! !
+		self
+		broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'midi' stamp: 'jm 6/2/2009 18:46'!
 notePlayerFor: aScratchObject
@@ -2297,13 +2314,14 @@ setZoomTo: percent
 	self changed.
 ! !
 
-!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 10/2/2015 20:01'!
+!ScratchStageMorph methodsFor: 'looks ops' stamp: 'EMP 4/26/2016 16:29'!
 showBackground: costumeNameOrIndex
 	"This is lookLike: for the stage..."
 
 	self lookLike: costumeNameOrIndex.
-	self broadcastEventNamed: 'Scratch-BackDropChanged' with: (self costumeNameFromNumber: costumeNameOrIndex).
-! !
+		self
+		broadcastEvent: (ScratchBackdropChangedEvent
+				bgName: (self costumeNameFromNumber: self backgroundIndex))! !
 
 !ScratchStageMorph methodsFor: 'accessing' stamp: 'jm 2/13/2009 14:49'!
 showMotorBlocks
@@ -2390,26 +2408,13 @@ startDrag: evt
 	"Ignore drag events."
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 6/4/2009 12:27'!
-startProcessFor: topBlock
-	"Start a process to run the given block or stack of blocks. Return the new process."
-
-	| sequence proc |
-	sequence _ topBlock blockSequence.
-	sequence first isHatBlock ifTrue: [
-		sequence _ sequence allButFirst].  "skip hat block"
-
-	topBlock scratchProc ifNotNil: [topBlock stop].
-
-	proc _ ScratchProcess new
-		topBlock: topBlock;
-		expression: sequence.
-	topBlock scratchProc: proc.
-
-	(runningBlocks includes: topBlock) ifFalse: [runningBlocks addLast: topBlock].
-
-	^ proc
-! !
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/26/2016 16:14'!
+startProcessFor: t1 
+	| t2 |
+	t2 := ScratchProcess forBlock: t1.
+	(runningBlocks includes: t1)
+		ifFalse: [runningBlocks addLast: t1].
+	^ t2! !
 
 !ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'jm 12/12/2008 14:08'!
 stepProcesses
@@ -2436,7 +2441,7 @@ stepProcesses
 	inProcessStep _ false.
 ! !
 
-!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 10/21/2015 15:41'!
+!ScratchStageMorph methodsFor: 'scratch processes/events' stamp: 'EMP 4/27/2016 12:17'!
 stepProcessesTurbo
 	"Run each Scratch process until it gives up control, then filter out any processes that have terminated. Do this repeatedly until time is up."
 
@@ -2445,14 +2450,13 @@ stepProcessesTurbo
 	inProcessStep ifTrue: [^ self].
 	inProcessStep _ true.
 
-	startMSecs _ Time millisecondClockValue.
-	[
-		[now _ Time millisecondClockValue.
+	startMSecs _ Time millisecondClockValue	.
+	
+		[[now _ Time millisecondClockValue.
 		 runningBlocks size > 0 and:
 		  [(now >= startMSecs) and: [(now - startMSecs) < sliceMSecs]]] whileTrue: [
 			self processesToRun do: [:p | (proc _ p) runStepFor: self].
-			self removeTerminatedProcesses].
-	] ifError: [(proc stackFrame expression isKindOf: Array) ifTrue: [proc errorFlagImmediate: true. proc stackFrame expression first showError. proc stackFrame expression first topBlock showErrorFeedback] ifFalse: [proc errorFlag: true]].
+			self removeTerminatedProcesses]] ifError: [proc errorFlag: true].
 
 	inProcessStep _ false.
 ! !

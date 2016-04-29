@@ -1,5 +1,5 @@
 Morph subclass: #ScriptableScratchMorph
-	instanceVariableNames: 'objName vars lists blocksBin isClone media costume costumeChangeMSecs filterPack visibility volume tempoBPM sceneStates '
+	instanceVariableNames: 'objName blocksBin vars lists isClone media costume costumeChangeMSecs filterPack visibility volume tempoBPM sceneStates '
 	classVariableNames: 'BlockColorDict BlockSpecDict DefaultBackgroundForm DefaultSpriteForm DoubleSize Experimental ListBlockColor MeowSound OldMeowPrefixReversed PopSound RandomGen Recorder ScratchOrigin TimerStartMSecs '
 	poolDictionaries: ''
 	category: 'Scratch-Objects'!
@@ -34,6 +34,13 @@ initialize
 	sceneStates _ Dictionary new.
 ! !
 
+
+!ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:25'!
+backdropChangedScriptsFor: t1 
+	^ (self scripts
+		select: [:t2 | t2 isBackdropEventHatMorph])
+		select: [:t2 | (t2 respondsToBackdropName: t1)
+				& t2 nextBlock notNil]! !
 
 !ScriptableScratchMorph methodsFor: 'accessing' stamp: 'jm 8/2/2004 20:42'!
 costume
@@ -222,20 +229,6 @@ rotationCenter: aPoint
 	self costumeChanged.
 ! !
 
-!ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 12/12/2015 11:20'!
-scratch2blocks
-	^ #(#setRotStyle: #COUNT #'INCR_COUNT' #'CLR_COUNT' #createCloneOf #deleteClone #stopScripts #warpSpeed #doWhile #doForLoop #createCloneOf #startScene #timeAndDate #backdropName #timestamp #getUserName #isLoud #costumeName #startSceneAndWait)! !
-
-!ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 12/12/2015 11:20'!
-selectorExceptions
-	"DO NOT MODIFY UNLESS YOU HAVE ADDED A BLOCK THAT REQUIRES A SPECIAL SELECTOR.
-		For these selectors, see 
-
-		CommandBlockMorph>evaluateWithArgs
-
-	"
-	^ #(#COUNT #'INCR_COUNT' #'CLR_COUNT' #createCloneOf #startScene #timeAndDate #backdropName #getUserName #startSceneAndWait)! !
-
 !ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 10/6/2015 14:42'!
 showList: t1
 	| t3 t4 t5 t2 |
@@ -254,11 +247,23 @@ showList: t1
 	(t5 _ self ownerThatIsA: ScratchFrameMorph) ifNil: [^ self].
 	t5 viewerPane categoryChanged: 'variables'! !
 
+!ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:46'!
+whenClonedScripts
+	^ self scripts
+		select: [:t1 | t1 isWhenCloneHat & t1 nextBlock notNil]! !
+
 !ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 10/3/2015 19:10'!
 whenTrueGet: anAttribute numberTesting: number
 	anAttribute asString = 'timer' ifTrue: [^ self timer].
 	anAttribute asString = 'loudness' ifTrue: [^ self soundLevel].
 	^ number asNumberNoError - 1! !
+
+!ScriptableScratchMorph methodsFor: 'accessing' stamp: 'EMP 4/29/2016 13:48'!
+wordsFrom: aString
+	| string |
+	string _ 'obsolete '.
+	aString do: [:char | char = $: ifTrue: [string _ string, '%n ']].
+	^ string! !
 
 
 !ScriptableScratchMorph methodsFor: 'looks ops' stamp: 'EMP 2/24/2016 18:43'!
@@ -1346,13 +1351,13 @@ createListNamed: listName
 		list startStepping].
 ! !
 
-!ScriptableScratchMorph methodsFor: 'list ops' stamp: 'EMP 1/6/2016 14:47'!
+!ScriptableScratchMorph methodsFor: 'list ops' stamp: 'EMP 4/28/2016 11:54'!
 customBlockFromTuple: tuple receiver: scriptOwner
 	"Answer a new block for the given tuple."
 
 	| spec blockColor block argCount arg argBlock |
 
-	(tuple first = #getParam) ifTrue: [spec _ {tuple second. tuple third. tuple second}. blockColor _ (Color r: 89/255 g: 71/255 b: 177/255).] ifFalse: [spec _ {tuple second. #s. tuple first}. blockColor _ (Color r: 99/255 g: 45/255 b: 153/255).].
+	(tuple first = #getParam) ifTrue: [spec _ {tuple second. tuple third. tuple second}. blockColor _ (Color r: 89/255 g: 71/255 b: 177/255).] ifFalse: [spec _ {tuple second. (tuple first = #callReporter) ifTrue: [#rs] ifFalse: [#s]. tuple first}. blockColor _ (Color r: 99/255 g: 45/255 b: 153/255).].
 
 	block _ scriptOwner customBlockFromSpec: spec color: blockColor.
 	(block isKindOf: CommandBlockMorph) ifTrue: [
@@ -1877,41 +1882,20 @@ computeFunction: functionName of: aNumber
 	^ 0
 ! !
 
-!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 10/2/2015 21:44'!
-eventReceived: event
-	"Start all non-running stacks with an EventHat matching the given events and answer a collection of the new processes. If a process is already running for a given stack, don't start a new one."
+!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 4/26/2016 16:31'!
+eventReceived: t1 
+	| t2 t3 |
+	t2 := t1 extractTargetScriptsFrom: self.
+	t3 := t2 asArray
+				collect: [:t4 | t4 startForEvent: t1].
+	^ t3
+		select: [:t4 | t4 notNil]! !
 
-	| targetScripts newProcs |
-	targetScripts _ #().
-	event name = 'Scratch-KeyPressedEvent'
-		ifTrue: [
-			targetScripts _ self scripts select: [:s |
-				(s class == KeyEventHatMorph) and:
-				 [s respondsToKeyEvent: event argument]]]
-		ifFalse: [
-			event name = 'Scratch-MouseClickEvent'
-				ifTrue: [
-					self isHidden not ifTrue: [
-						targetScripts _ self scripts select: [:s |
-							s class == MouseClickEventHatMorph]]]
-				ifFalse: [
-					event name = 'Scratch-BackDropChanged'
-						ifTrue: [targetScripts _ self scripts select: [:s |
-							(s class = BackdropHatBlockMorph) and: 
-							[s respondsToBackdropName: event argument]]]
-						ifFalse: [
-									event name = 'Scratch-StartedAsClone'
-										ifTrue: [targetScripts _ self scripts select: [:s |
-							(s class = WhenCloneHatBlock)]]
-										ifFalse: [
-					targetScripts _ self scripts select: [:s |
-						(s class == EventHatMorph) and:
-						 [s eventName caseInsensitiveEqual: event name]]]]]].
-	
-	newProcs _ targetScripts asArray collect: [:script | script startForEvent: event].
-	^ newProcs select: [:p | p notNil]
-
-! !
+!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 4/26/2016 16:31'!
+keypressEventScriptsFor: t1 
+	^ self scripts
+		select: [:t2 | (t2 respondsToKeyEvent: t1)
+				& t2 nextBlock notNil]! !
 
 !ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 10/6/2015 14:38'!
 mathFunctionNames
@@ -1934,12 +1918,25 @@ mathFunctionNames
 		'10 ^')
 ! !
 
+!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 4/26/2016 16:37'!
+mouseClickEventScripts
+	self isVisible
+		ifTrue: [^ self scripts
+				select: [:t1 | t1 isMouseClickEventHatMorph & t1 nextBlock notNil]].
+	^ #()! !
+
 !ScriptableScratchMorph methodsFor: 'other ops' stamp: 'jm 5/18/2006 07:43'!
 mwait: duration elapsed: elapsed from: ignored
 	"Do nothing; just wait for the time interval to elapse."
 
 	^ nil
 ! !
+
+!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 4/26/2016 16:31'!
+namedEventScriptsFor: t1 
+	^ self scripts
+		select: [:t2 | (t2 eventNameMatches: t1)
+				& t2 nextBlock notNil]! !
 
 !ScriptableScratchMorph methodsFor: 'other ops' stamp: 'jm 10/4/2007 15:23'!
 randomFrom: start to: stop
@@ -1954,6 +1951,12 @@ randomFrom: start to: stop
 		ifFalse: [result _ (RandomGen next * (max - min)) + min].
 	^ result
 ! !
+
+!ScriptableScratchMorph methodsFor: 'other ops' stamp: 'EMP 4/26/2016 16:31'!
+startClickEventScripts
+	^ self scripts
+		select: [:t1 | (t1 eventNameMatches: 'Scratch-StartClicked')
+				& t1 nextBlock notNil]! !
 
 !ScriptableScratchMorph methodsFor: 'other ops' stamp: 'jm 8/8/2005 12:21'!
 stopAll
@@ -2554,7 +2557,7 @@ blockCategories
 		(el isKindOf: String) and: [el ~= '-' and: [el ~= '~']]]) asArray
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 1/6/2016 15:43'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/29/2016 13:33'!
 blockFromSpec: spec color: blockColor
 	"Create a block from the given block specification. Answer nil if I don't implement the block spec selector."
 
@@ -2586,13 +2589,11 @@ blockFromSpec: spec color: blockColor
 	(blockType includes: $s) ifTrue: [block isSpecialForm: true].
 	(blockType includes: $t) ifTrue: [block isTimed: true].
 
-	rcvr _ self. "Fix for nasty 2.0 project loading bug"
 	(ScriptableScratchMorph isSpriteSpecificTarget: self selector: selector)
 		ifTrue: [rcvr _ self]
 		ifFalse: [rcvr _ self ownerThatIsA: ScratchStageMorph].
 	newBlockColor _ blockColor.
 	"under this comment is a kind of messy way to check it a block has been implemented in the code yet"
-	((self respondsTo: selector) | (ScratchStageMorph new respondsTo: selector) | (ScratchSpriteMorph new respondsTo: selector) | (1 respondsTo: selector) | (true respondsTo: selector) | (ScratchProcess new respondsTo: selector) | ((self selectorExceptions) includes: selector)) not ifTrue: [newBlockColor _ (Color r: 255 g: 255 b: 255)].
 	^ block
 		argPermutation: argPermutation;
 		color: newBlockColor;
@@ -2602,7 +2603,7 @@ blockFromSpec: spec color: blockColor
 		receiver: rcvr
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/6/2016 15:22'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/29/2016 13:49'!
 blockFromTuple: tuple receiver: scriptOwner
 	"Answer a new block for the given tuple."
 
@@ -2613,7 +2614,7 @@ blockFromTuple: tuple receiver: scriptOwner
 		^ self fixForeverIfScript: tuple receiver: scriptOwner].
 
 
-	(#(call getParam) includes: k) ifTrue: [
+	(#(call callReporter getParam) includes: k) ifTrue: [
 		^ self customBlockFromTuple: tuple receiver: scriptOwner].
 
 	(#(readVariable changeVariable) includes: k) ifTrue: [
@@ -2648,7 +2649,7 @@ blockFromTuple: tuple receiver: scriptOwner
 	spec _ BlockSpecDict at: k ifAbsent: [nil].
 	spec ifNil: [
 		^ scriptOwner
-			blockFromSpec: {'obsolete'. #-. k}
+			blockFromSpec: {(self wordsFrom: k asString). #-. k}
 			color: Color red].
 
 	blockColor _ BlockColorDict at: k ifAbsent: [Color red].
@@ -2685,7 +2686,7 @@ blockFromTuple: tuple receiver: scriptOwner
 	^ block
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/6/2016 15:20'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/28/2016 11:54'!
 blockFromTupleTwo: oldTuple receiver: scriptOwner
 	"Answer a new block for the given tuple."
 
@@ -2699,7 +2700,7 @@ blockFromTupleTwo: oldTuple receiver: scriptOwner
 	#doForeverIf = k ifTrue: [
 		^ self fixForeverIfScript: oldTuple receiver: scriptOwner].
 
-	(#(call getParam) includes: k) ifTrue: [
+	(#(call callReporter getParam) includes: k) ifTrue: [
 		^ self customBlockFromTupleTwo: tuple receiver: scriptOwner].
 
 	(#(readVariable changeVariable changeVar:by: setVar:to:) includes: k) ifTrue: [
@@ -2815,7 +2816,7 @@ blocksBin: aMorph
 	blocksBin _ aMorph
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/6/2016 12:15'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/27/2016 16:00'!
 blocksFor: aCategory
 	"Answer a collection of blocks for the given category. Mixed with the blocks are dash and tilde symbols (#- and #~) indicating where full and half spaces should be inserted when laying out the blocks."
 
@@ -2836,9 +2837,8 @@ blocksFor: aCategory
 	aCategory = 'more blocks' ifTrue: [
 	(blocksBin submorphs select: [:submorph | submorph isKindOf: ProcedureHatBlockMorph]) do: [:hatBlock | b _ self procBlockFromSpec: {hatBlock procedure asString. #s. #call} color: (Color r: 99/255 g: 45/255 b: 153/255). blocksList addLast: b. 
 
-	"b _ self procBlockFromSpec: {hatBlock procedure asString. #r. #call} color: (Color r: 99/255 g: 45/255 b: 153/255). 
-	blocksList addLast: b
-	xxx This was a beta prototype of custom reporters; not completely finished, but getting more stable each release"
+	Experimental ifTrue: [b _ self procBlockFromSpec: {hatBlock procedure asString. #rs. #callReporter} color: (Color r: 99/255 g: 45/255 b: 153/255). 
+	blocksList addLast: b]
 ]].
 	^ blocksList asArray
 ! !
@@ -2864,7 +2864,7 @@ blocksForNoOther: aCategory
 	^ blocksList asArray
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 11/23/2015 10:17'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/27/2016 16:06'!
 convertStacksToTuples
 	"Convert my blocks bin from a morph containing block stack into a collection of (<point>, <tuple>) pairs the represent the same stacks in compact, language-independent form."
 
@@ -2872,7 +2872,7 @@ convertStacksToTuples
 	(blocksBin isKindOf: Array) ifTrue: [^ self].  "already converted"
 
 	stacks _ (blocksBin submorphs select: [:m | m respondsTo: #tupleSequence]).
-	blocks _ stacks select: [:m | m isKindOf: BlockMorph].
+	blocks _ stacks select: [:m | m isBlockMorph].
 	comments _ stacks select: [:m | m isKindOf: ScratchCommentMorph].
 
 	blocks _ blocks collect: [:blockM |
@@ -3143,7 +3143,7 @@ createToggleButtonFor: block
 	^ toggleButton
 ! !
 
-!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 2/24/2016 18:40'!
+!ScriptableScratchMorph methodsFor: 'blocks' stamp: 'EMP 4/28/2016 12:36'!
 customBlockFromSpec: spec color: blockColor
 	"Create a block from the given block specification. Answer nil if I don't implement the block spec selector."
 
@@ -3165,7 +3165,7 @@ customBlockFromSpec: spec color: blockColor
 				ifFalse: [block _ CBlockMorph new isSpecialForm: true]]
 		ifFalse:	[
 			(blockType includes: $r) | (blockType includes: $b)
-				ifTrue: [block _ CustomReporterMorph new]
+				ifTrue: [block _ (selector = #callReporter) ifTrue: [ProcReporterCallBlockMorph new] ifFalse: [CustomReporterMorph new]]
 				ifFalse: [block _ ProcCallBlockMorph new]].
 	"DialogBoxMorph inform: blockType asString."
 	(blockType includes: $b) ifTrue: [block isBoolean: true].
@@ -3814,19 +3814,15 @@ rejectDropEvent: evt
 ! !
 
 
-!ScriptableScratchMorph methodsFor: 'event handling' stamp: 'jm 11/28/2007 15:07'!
+!ScriptableScratchMorph methodsFor: 'event handling' stamp: 'EMP 4/26/2016 16:36'!
 click: evt
 	"Start or stop all my clickable scripts."
 
-	| h clickEvt |
+	| h |
 	h _ World activeHand.
 	h toolType ifNotNil: [^ self handleTool: h toolType hand: h].
 
-	clickEvt _ ScratchEvent new
-		name: 'Scratch-MouseClickEvent'
-		argument: 0.
-	self eventReceived: clickEvt.
-! !
+	self eventReceived: ScratchMouseClickEvent new! !
 
 !ScriptableScratchMorph methodsFor: 'event handling' stamp: 'jm 10/7/2005 15:56'!
 doubleClick: evt
@@ -4790,6 +4786,11 @@ zoomRectFrom: startRect to: finalRect
 	Display forceDisplayUpdate.
 ! !
 
+
+!ScriptableScratchMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:51'!
+bindCustom: oldSpec to: newSpec
+	(((ProcCallBlockMorph allInstances), (ProcReporterCallBlockMorph allInstances)) select: [:m | m commandSpec asUTF8 = oldSpec asUTF8]) do: [:block | block commandSpec: newSpec].! !
+
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 ScriptableScratchMorph class
@@ -4836,7 +4837,7 @@ blockColorDict
 	^ BlockColorDict
 ! !
 
-!ScriptableScratchMorph class methodsFor: 'block specs' stamp: 'EMP 1/6/2016 14:50'!
+!ScriptableScratchMorph class methodsFor: 'block specs' stamp: 'EMP 4/19/2016 12:15'!
 blockColorFor: aCategory
 	"Answer the block color for the given category."
 
@@ -4846,7 +4847,7 @@ blockColorFor: aCategory
 	'motor' = aCategory ifTrue: [^ (Color h: 220 s: 0.85 v: 0.725)].
 	'looks' = aCategory ifTrue: [^ (Color h: 264 s: 0.62 v: 0.89)].
 	'pen' = aCategory ifTrue: [^ (Color r: 14/255 g: 154/255 b: 108/255)].
-	'operators' = aCategory ifTrue: [^ (Color h: 93 s: 0.9 v: 0.76)].
+	'operators' = aCategory ifTrue: [^ (Color r: 92/255 g: 183/255 b: 22/255)].
 	'sound' = aCategory ifTrue: [^ (Color h: 296 s: 0.66 v: 0.85)].
 	'sensing' = aCategory ifTrue: [^ (Color h: 200 s: 0.98 v: 0.86)].
 	'variables' = aCategory ifTrue: [^ (Color r: 238/255 g: 125/255 b: 22/255)].
@@ -4990,7 +4991,7 @@ listBlockColor
 	^ ListBlockColor
 ! !
 
-!ScriptableScratchMorph class methodsFor: 'block specs' stamp: 'EMP 4/12/2016 13:44'!
+!ScriptableScratchMorph class methodsFor: 'block specs' stamp: 'EMP 4/12/2016 14:27'!
 moreBlocks
 	^ #('sensing'
 			-
@@ -4998,7 +4999,7 @@ moreBlocks
 			('%m.sensor sensor value'				r	sensor: 'slider')
 			('sensor %m.booleanSensor ?'			b	sensorPressed: 'button pressed')
 		'other blocks' "Create the base for the custom blox"
-		), (Experimental ifTrue: [#('control' ('return %s' s report))] ifFalse: [(ScratchFrameMorph getSetting: #backwardsSpecial) ifTrue: [#(
+		), (Experimental ifTrue: [#('control' ('return %s' s report))] ifFalse: [false ifTrue: [#(
 		'more blocks'
 			('When <>'								W	-)
 )] ifFalse: [#()]]).! !
@@ -5304,6 +5305,10 @@ resetTimer
 
 	TimerStartMSecs _ Time millisecondClockValue.
 ! !
+
+!ScriptableScratchMorph class methodsFor: 'other' stamp: 'EMP 4/27/2016 13:09'!
+scratch2blocks
+	^ #(#COUNT #'INCR_COUNT' #'CLR_COUNT' #warpSpeed #doWhile #doForLoop #isLoud #costumeName #startSceneAndWait)! !
 
 !ScriptableScratchMorph class methodsFor: 'other' stamp: 'jm 10/21/2005 11:21'!
 scratchOrigin: aPoint

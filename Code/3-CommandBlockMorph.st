@@ -1,5 +1,5 @@
 BlockMorph subclass: #CommandBlockMorph
-	instanceVariableNames: 'commandSpec argPermutation argMorphs titleMorph receiver selector isReporter isTimed wantsName wantsPossession numberArgFlags isMobile '
+	instanceVariableNames: 'commandSpec argPermutation argMorphs titleMorph receiver selector isReporter isTimed wantsName wantsPossession numberArgFlags isMobile stopFrame '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Scratch-Blocks'!
@@ -115,6 +115,10 @@ helpScreenName
 	^ selector asString collect: [:ch | ch = $: ifTrue: [$_] ifFalse: [ch]]
 ! !
 
+!CommandBlockMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:03'!
+isCommandBlockMorph
+	^ true! !
+
 !CommandBlockMorph methodsFor: 'accessing' stamp: 'jm 4/15/2007 20:01'!
 isForever
 
@@ -198,6 +202,14 @@ selectorAndArg
 	^ Array with: selector with: (args size = 0 ifTrue: [nil] ifFalse: [args first])
 ! !
 
+!CommandBlockMorph methodsFor: 'accessing' stamp: 'EMP 4/15/2016 17:30'!
+stopFrame
+	^ stopFrame! !
+
+!CommandBlockMorph methodsFor: 'accessing' stamp: 'EMP 4/15/2016 17:30'!
+stopFrame: t1 
+	stopFrame _ t1! !
+
 
 !CommandBlockMorph methodsFor: 'evaluation' stamp: 'ee 3/2/2009 11:53'!
 argumentAt: index
@@ -212,6 +224,10 @@ argumentCount
 
 	^ argMorphs size
 ! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:52'!
+buildPrompter
+	^ receiver promptForInput: self args first asString! !
 
 !CommandBlockMorph methodsFor: 'evaluation' stamp: 'ee 2/28/2009 17:09'!
 coerceArgs: argList
@@ -234,12 +250,16 @@ coerceArgs: argList
 	^ args
 ! !
 
-!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 1/12/2016 15:31'!
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/28/2016 16:12'!
 evaluate
-	self isSpecialForm ifTrue: [] ifFalse: [^ self evaluateWithArgs: self args].
+	^ self evaluateWithArgs: self args
 ! !
 
-!CommandBlockMorph methodsFor: 'evaluation' stamp: 'jm 6/25/2009 16:05'!
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:17'!
+evaluateInStackFrame: t1 
+	^ self evaluateWithArgs: t1 arguments! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/29/2016 14:55'!
 evaluateInfixWithArgs: rawArgs
 	"Evalue an infix operator with the given arguments list. Special case for comparison operatores when both operands are strings. Reverse order of comparison operands in RTL languages."
 	"Note: The strings 'true' and 'false' in either English or the current language are equal to the boolean value that they name."
@@ -264,22 +284,23 @@ evaluateInfixWithArgs: rawArgs
 		ifTrue: [((args first isKindOf: String) or: [args second isKindOf: String]) ifTrue: [
 				arg1 _ receiver interpretStringAsNumberIfPossible: args first.
 				arg2 _ receiver interpretStringAsNumberIfPossible: args second.
-				((arg1 isKindOf: String) and: [arg2 isKindOf: String]) ifTrue: [
+				((arg1 isString) and: [arg2 isString]) ifTrue: [
 					result _ args first compare: args second.
 					#< = selector ifTrue: [^ result = 1].
 					#= = selector ifTrue: [^ result = 2].
 					#> = selector ifTrue: [^ result = 3]].
-				((arg1 isKindOf: Number) and: [arg2 isKindOf: Number]) ifTrue: [
+				((arg1 isNumber) and: [arg2 isNumber]) ifTrue: [
 					^ arg1 perform: selector with: arg2].
 				^ false]]
 		ifFalse: [(ScratchTranslator isRTLMath and: [((selector = #\\) not)]) ifTrue: [args _ args reversed]]. "RTLMath operators are RTL"
 
+	((selector = #/) and: [args second = 0]) ifTrue: [^ Float nan].
+	((selector = #\\) and: [args second = 0]) ifTrue: [^ Float nan].
 	(#(& |) includes: selector) ifTrue: [^ args first perform: selector with: args second].
-
 	^ args first asNumberNoError perform: selector with: args second asNumberNoError
 ! !
 
-!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 12/1/2015 16:35'!
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/27/2016 13:03'!
 evaluateWithArgs: rawArgs
 	"Evalue this block with the given argument list."
 
@@ -295,12 +316,17 @@ evaluateWithArgs: rawArgs
 	self selector == #createCloneOf ifTrue: [^ receiver perform: #createCloneOf: withArguments: args].
 	self selector == #startScene ifTrue: [^ receiver perform: #changeBackdropTo: withArguments: args].
 	self selector == #timeAndDate ifTrue: [^ receiver perform: #getDateOrTime: withArguments: args].
+	self selector == #setRotationStyle ifTrue: [^ receiver perform: #setRotStyle: withArguments: args].
 	self selector == #'CLR_COUNT' ifTrue: [^ receiver perform: #resetCounter].
 	self selector == #'INCR_COUNT' ifTrue: [^ receiver perform: #incCounter].
 	self selector == #COUNT ifTrue: [^ receiver perform: #getCounter].
 	"end special selectors"
 	^ receiver perform: selector withArguments: args
 ! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:22'!
+hasDeletedReceiver
+	^ receiver owner isNil! !
 
 !CommandBlockMorph methodsFor: 'evaluation' stamp: 'jm 5/5/2009 17:05'!
 organizeArgs: argList
@@ -314,6 +340,41 @@ organizeArgs: argList
 		newArgList _ newArgList copyWith: (argList at: (argPermutation at: i))].
 	^ newArgList
 ! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:51'!
+promptInProgress
+	^ receiver promptInProgress! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:22'!
+startSoundCommand
+	| t1 |
+	t1 := receiver
+				soundNamed: self args first
+				ifAbsent: [^ nil].
+	t1 playFromStart.
+	^ t1! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:22'!
+startTimedCommandWith: t1 
+	^ receiver perform: selector withArguments: t1
+			, (Array with: 0 with: nil)! !
+
+!CommandBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:22'!
+stepTimedCommandWith: t1 after: t2 
+	| t3 |
+	t3 := (t1 at: t1 size - 2)
+				* 1000.
+	selector = #glideSecs:toX:y:elapsed:from:
+		ifTrue: [t3 := t1 first * 1000].
+	selector = #mwait:elapsed:from:
+		ifTrue: [t3 := t1 at: t1 size - 2].
+	(selector = #drum:duration:elapsed:from:
+			or: [selector = #noteOn:duration:elapsed:from:])
+		ifTrue: [t3 := 60000 * t1 second / receiver tempo].
+	selector = #rest:elapsed:from:
+		ifTrue: [t3 := 60000 * t1 first / receiver tempo].
+	receiver perform: selector withArguments: t1.
+	^ t2 < t3! !
 
 
 !CommandBlockMorph methodsFor: 'menus' stamp: 'EMP 2/9/2016 15:26'!
@@ -358,18 +419,18 @@ tabToNextField: evt
 	evt hand newKeyboardFocus: (fields at: (t3 \\ fields size  + 1)) labelMorph! !
 
 
-!CommandBlockMorph methodsFor: 'processes' stamp: 'jm 12/21/2008 12:25'!
+!CommandBlockMorph methodsFor: 'processes' stamp: 'EMP 4/16/2016 11:53'!
 start
-
-	| stage |
+	| t1 t2 |
 	self stop.
 	self receiver ifNil: [^ self].
-	scratchProc ifNotNil: [^ self].  "this stack is already running"
-
-	(stage _ self receiver ownerThatIsA: ScratchStageMorph) ifNil: [^ self].
-	scratchProc _ stage startProcessFor: self.
-	self changed.
-! !
+	scratchProc ifNotNil: [^ self].
+	t2 _ self receiver.
+	(t2 isKindOf: ScriptableScratchMorph)
+		ifTrue: [(t1 _ t2 ownerThatIsA: ScratchStageMorph) ifNil: [^ self]]
+		ifFalse: [t1 _ (self ownerThatIsA: ScratchFrameMorph) workPane].
+	scratchProc _ t1 startProcessFor: self.
+	self changed! !
 
 !CommandBlockMorph methodsFor: 'processes' stamp: 'EMP 11/8/2015 11:45'!
 startDrag: evt
@@ -450,30 +511,17 @@ isStop
 	^ (selector = #doReturn) | (selector = #stopAll) | (selector = #deleteClone) | (self evaluateIsStop)! !
 
 
-!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 4/11/2016 15:42'!
+!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 4/29/2016 14:38'!
 addCommandIcons
-	| t1 t2 t3 |
-	true ifTrue: [^ self].
-	#turnLeft: = selector
-		ifTrue: [t1 := ScratchFrameMorph
-						skinAt: #turnCCW
+	| t1 t3 |
+	(("ScriptableScratchMorph scratch2blocks" #()) includes: selector) ifFalse: [^ self].
+	t1 := ScratchFrameMorph
+						skinAt: #specialNot
 						ifAbsent: [^ self].
 			t3 := Form extent: 15 @ 14 depth: t1 depth.
 			t1 displayInterpolatedIn: t3 boundingBox on: t3.
-			t2 := self firstSubmorph delete.
 			self
-				addMorphFront: (ImageMorph new form: t3).
-			self addMorphFront: t2].
-	#turnRight: = selector
-		ifTrue: [t1 := ScratchFrameMorph
-						skinAt: #turnCW
-						ifAbsent: [^ self].
-			t3 := Form extent: 14 @ 14 depth: t1 depth.
-			t1 displayInterpolatedIn: t3 boundingBox on: t3.
-			t2 := self firstSubmorph delete.
-			self
-				addMorphFront: (ImageMorph new form: t3).
-			self addMorphFront: t2]! !
+				addMorphBack: (ImageMorph new form: t3).! !
 
 !CommandBlockMorph methodsFor: 'private' stamp: 'EMP 4/11/2016 16:14'!
 addLabel
@@ -562,7 +610,7 @@ argMorphToReplace: aMorph
 	^ argM
 ! !
 
-!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 10/3/2015 17:12'!
+!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 4/27/2016 14:54'!
 canBecomeWatcher
 	"I determine which blocks can become watchers."
 
@@ -570,7 +618,7 @@ canBecomeWatcher
 	i _ selector asString findAnySubStr: #('mouse' 'key' 'touching' 'distance') startingAt: 1.
 	^ (self isReporter) &
 	   (self argumentCount <= 1) &
-	   ((#(not atRandom abs rounded lineCountOfList: stringLength: COUNT) includes: selector) not) &
+	   ((#(not atRandom abs rounded lineCountOfList: stringLength: COUNT call) includes: selector) not) &
 	   (i > selector asString size)
 ! !
 
@@ -754,13 +802,12 @@ replaceArgMorph: oldMorph by: newMorph
 	self layoutChanged.
 ! !
 
-!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 11/8/2015 11:49'!
+!CommandBlockMorph methodsFor: 'private' stamp: 'EMP 4/13/2016 15:41'!
 rightButtonMenu
 
 	| menu sFrame choice spec |
 	isMobile ifFalse: [^ (self ownerThatIsA: ProcedureHatBlockMorph) rightButtonMenu].
 	menu _ CustomMenu new.
-	menu add: 'help' action: #presentHelpScreen.
 
 	(owner isKindOf: ScratchBlockPaletteMorph) ifFalse: [
 		menu addLine.
@@ -774,7 +821,10 @@ rightButtonMenu
 		menu addLine.
 		menu add: 'duplicate' action: #duplicate.
 		(self owner isKindOf: BlockMorph) ifFalse: [  "can't yet delete a blocks inside a script"
-			menu add: 'delete' action: #delete]].
+			menu add: 'delete' action: #delete].
+		menu addLine.
+		menu add: 'add comment' action: #addComment].
+	menu add: 'help' action: #presentHelpScreen.
 
 	sFrame _ self ownerThatIsA: ScratchFrameMorph.
 	(sFrame notNil and: [#(sensor: sensorPressed:) includes: selector]) ifTrue: [
@@ -789,7 +839,7 @@ rightButtonMenu
 		menu add: 'show tuples' action: #showTuples].
 	
 	(choice _ menu localize; startUp) ifNil: [^ self].
-	(#(presentHelpScreen duplicate delete) includes: choice) ifTrue: [^ self perform: choice].
+	(#(presentHelpScreen duplicate delete addComment) includes: choice) ifTrue: [^ self perform: choice].
 	choice = #showSensorBoard ifTrue: [sFrame showSensorBoard. ^ self].
 	choice = #enableRemoteSensors ifTrue: [sFrame enableRemoteSensors. ^ self].
 	choice = #exitScratchSession ifTrue: [sFrame exitScratchSession. ^ self].

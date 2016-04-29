@@ -20,30 +20,23 @@ Structure:
 !
 
 
-!ScratchStackFrame methodsFor: 'initialization' stamp: 'jm 3/23/2005 09:09'!
+!ScratchStackFrame methodsFor: 'initialization' stamp: 'EMP 4/26/2016 16:01'!
 initialize
-
-	parentFrame _ nil.
-	expression _ nil.
-	arguments _ OrderedCollection new. 
-	pc _ 1.
-	shouldUnlight _ false.
-! !
+	parentFrame := nil.
+	expression := nil.
+	arguments := OrderedCollection new.
+	pc := 1.
+	shouldUnlight := false! !
 
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/9/2003 19:46'!
-addArgument: aValue
-	"Adds this value to the list of evaluated arguments available in this stack frame."
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:01'!
+addArgument: t1 
+	self arguments add: t1! !
 
-	arguments add: aValue.
-! !
-
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'ee 2/27/2009 13:09'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 arguments
-	"Answers the values of the arguments to be sent to the current command."
-
 	^ arguments
-! !
+		ifNil: [arguments := OrderedCollection new: 4]! !
 
 !ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/5/2016 15:39'!
 arguments: anOrderedCollection
@@ -52,37 +45,45 @@ arguments: anOrderedCollection
 	^ arguments _ anOrderedCollection
 ! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/4/2003 11:50'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+coerceArguments
+	arguments
+		ifNil: [^ #()].
+	^ expression coerceArgs: self arguments! !
+
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 expression
+	^ expression! !
 
-	^ expression
-! !
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+expression: t1 
+	expression := t1! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/4/2003 11:33'!
-expression: anExpression
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+firstArg
+	^ arguments
+		ifNotNil: [arguments first]! !
 
-	expression _ anExpression.
-! !
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+needsMoreArgumentsEvaluated
+	^ self numberOfArgumentsReady < expression argumentCount! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/8/2003 00:11'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+needsUnlighting
+	^ expression isBlockMorph! !
+
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 parentFrame
+	^ parentFrame! !
 
-	^ parentFrame
-! !
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+parentFrame: t1 
+	parentFrame := t1! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/8/2003 00:10'!
-parentFrame: aScratchStackFrame
-	"Sets this frame's parent frame."
-
-	parentFrame _ aScratchStackFrame.
-! !
-
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/8/2003 00:06'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 pc
-	"Answers the current program counter."
-
 	^ pc
-! !
+		ifNil: [pc := 1]! !
 
 !ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 3/23/2005 09:04'!
 pc: anInteger
@@ -91,16 +92,18 @@ pc: anInteger
 	pc _ anInteger.
 ! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 1/22/2007 13:01'!
-printOn: aStream
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+printOn: t1 
+	t1 nextPutAll: 'ScratchStackFrame [' , expression printString , ']'! !
 
-	aStream nextPutAll: '[', expression printString, ' ', shouldUnlight printString, ']'.! !
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/28/2016 15:31'!
+secondArg
+	^ arguments
+		ifNotNil: [arguments second]! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 8/4/2003 17:23'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 shouldUnlight
-
-	^ shouldUnlight
-! !
+	^ false! !
 
 !ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 8/4/2003 17:23'!
 shouldUnlight: aBoolean
@@ -108,21 +111,13 @@ shouldUnlight: aBoolean
 	shouldUnlight _ aBoolean.
 ! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/9/2003 18:35'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
 shouldYield
-	"Answers true iff this is a dummy frame simply indicating that the process should yield control."
+	^ false! !
 
-	^ expression = #shouldYield
-! !
-
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'DaveF 7/9/2003 18:05'!
-shouldYield: aBoolean
-	"Makes this into a special stack frame that tells the evaluator to yield control to another process. When this flag is set, the rest of the stack frame is ignored."
-
-	aBoolean
-		ifTrue: [expression _ #shouldYield]
-		ifFalse: [self error: 'Should not call shouldYield: with false.'].
-! !
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:02'!
+shouldYield: t1 
+	self error: 'Should not call shouldYield: any longer'! !
 
 !ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 8/22/2003 18:56'!
 startTime
@@ -150,22 +145,18 @@ startValue: aTime
 	startValue _ aTime.
 ! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 5/6/2007 13:47'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:03'!
 stopMIDI
-
 	(self startValue isKindOf: ScratchNotePlayer)
-		ifTrue: [startValue noteOff].
-! !
+		ifTrue: [startValue noteOff]! !
 
-!ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 5/19/2009 13:10'!
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:03'!
 stopMotors
-
-	| motorName |
-	(expression isKindOf: CommandBlockMorph) ifTrue: [
-		#motorOnFor:elapsed:from: = expression selector ifTrue: [
-			motorName _ startValue.
-			expression receiver motorOff: motorName]].
-! !
+	| t1 |
+	expression isCommandBlockMorph
+		ifTrue: [#motorOnFor:elapsed:from: = expression selector
+				ifTrue: [t1 := startValue.
+					expression receiver motorOff: t1]]! !
 
 !ScratchStackFrame methodsFor: 'accessing' stamp: 'jm 6/2/2009 11:31'!
 stopTalkThinkAsk
@@ -179,3 +170,88 @@ stopTalkThinkAsk
 		#doAsk = expression selector ifTrue: [
 			(s _ expression receiver ownerThatIsA: ScratchStageMorph) ifNotNil: [s stopAsks]]].
 ! !
+
+!ScratchStackFrame methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:03'!
+unlightExpression
+	expression litUp: false! !
+
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:51'!
+buildPrompter
+	^ expression buildPrompter! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:03'!
+evaluateExpression
+	^ expression evaluateInStackFrame: self! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 12:42'!
+evaluateIn: t1 
+	^ expression evaluateIn: t1! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+hasDeletedReceiver
+	^ expression hasDeletedReceiver! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+hasReceiver: t1 
+	^ expression receiver == t1! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+numberOfArgumentsReady
+	^ arguments
+		ifNil: [0]
+		ifNotNil: [arguments size]! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:51'!
+promptInProgress
+	^ expression promptInProgress! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+startSoundCommand
+	^ expression startSoundCommand! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+startTimedCommandWith: t1 at: t2 
+	startTime := t2.
+	startValue := expression startTimedCommandWith: t1! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+stepTimedCommandWith: t1 at: t2 
+	| t3 |
+	t3 := t2 - startTime.
+	^ expression stepTimedCommandWith: t1 asArray
+			, (Array with: t3 with: startValue) after: t3! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toEvaluateExpression
+	^ ScratchStackFrame forExpression: expression! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toEvaluateFalseBlockList
+	^ ScratchStackFrame forExpression: expression falseBlockList! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toEvaluateFirstBlockList
+	^ ScratchStackFrame forExpression: expression firstBlockList! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toEvaluateNextArgument
+	^ ScratchStackFrame
+		forExpression: (expression argumentAt: self numberOfArgumentsReady + 1)! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toEvaluateTrueBlockList
+	^ ScratchStackFrame forExpression: expression trueBlockList! !
+
+!ScratchStackFrame methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+toUnlightExpression
+	^ ScratchStackFrameToUnlight forExpression: expression! !
+
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+ScratchStackFrame class
+	instanceVariableNames: ''!
+
+!ScratchStackFrame class methodsFor: 'as yet unclassified' stamp: 'EMP 4/26/2016 16:04'!
+forExpression: t1 
+	^ super new expression: t1! !

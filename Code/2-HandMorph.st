@@ -817,7 +817,7 @@ updateMouseDownTransform
 ! !
 
 
-!HandMorph methodsFor: 'double click support' stamp: 'jm 5/2/2009 17:52'!
+!HandMorph methodsFor: 'double click support' stamp: 'EMP 4/29/2016 14:09'!
 checkForDoubleClick: evt
 	"Process the given mouse event to detect a click, double-click, or drag."
 
@@ -842,7 +842,8 @@ checkForDoubleClick: evt
 			clickState _ #idle.
 			clickClient doubleClick: firstClickEvent.
 			^ self resetClickState].
-		t > DoubleClickTime ifTrue: [
+		((t > DoubleClickTime) or: [clickClient isBlockMorph])
+		 ifTrue: [
 			clickState _ #idle.
 			clickClient click: firstClickEvent.
 			^ self resetClickState]].

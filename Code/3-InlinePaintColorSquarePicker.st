@@ -111,8 +111,3 @@ extent: aPoint
 		self layoutChanged.
 		self changed].
 ! !
-
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-InlinePaintColorSquarePicker class
-	instanceVariableNames: ''!

@@ -49,7 +49,7 @@ mode: aMode
 	mode _ aMode! !
 
 
-!ScratchTipsSidebarMorph methodsFor: 'event handling' stamp: 'EMP 12/9/2015 15:54'!
+!ScratchTipsSidebarMorph methodsFor: 'event handling' stamp: 'EMP 4/12/2016 14:25'!
 handlesMouseDown: evt
 	^ true! !
 
@@ -67,8 +67,9 @@ mouseDown: evt
 mouseLeave: evt
 	closeAndOpenButton off "We're turning it off just in case"! !
 
-!ScratchTipsSidebarMorph methodsFor: 'event handling' stamp: 'EMP 12/10/2015 12:39'!
+!ScratchTipsSidebarMorph methodsFor: 'event handling' stamp: 'EMP 4/12/2016 14:25'!
 toggleShowing
+	true ifTrue: [^ self].
 	(mode = #hidden) ifTrue: [
 	mode _ #visible.
 	self extent: self extent.
