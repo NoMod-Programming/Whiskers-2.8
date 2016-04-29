@@ -61,11 +61,12 @@ receiver: anObject
 		ifTrue: [self color: receiver variableBlockColor].
 ! !
 
-!SetterBlockMorph methodsFor: 'accessing' stamp: 'jm 7/13/2008 23:04'!
+!SetterBlockMorph methodsFor: 'accessing' stamp: 'EMP 4/28/2016 16:08'!
 variable
 
 	submorphs do: [:m |
-		(m isKindOf: ChoiceArgMorph) ifTrue: [^ m choice]].
+		(m isKindOf: ChoiceArgMorph) ifTrue: [^ m choice].
+		(m isKindOf: ReporterBlockMorph) ifTrue: [^ m tupleSequence]].
 	^ ''
 
 ! !

@@ -24,6 +24,10 @@ isMacRoman
 	^ true
 ! !
 
+!UTF32 methodsFor: 'accessing' stamp: 'EMP 4/16/2016 11:33'!
+isString
+	^ true! !
+
 !UTF32 methodsFor: 'accessing' stamp: 'jm 6/2/2008 16:01'!
 isUnicode
 	"Answer true if I represent a Unicode string."

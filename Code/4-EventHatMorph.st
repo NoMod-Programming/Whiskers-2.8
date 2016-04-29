@@ -88,6 +88,10 @@ eventName: aString
 		(self ownerThatIsA: ScratchViewerMorph) updateContents].
 ! !
 
+!EventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:32'!
+eventNameMatches: t1 
+	^ scriptNameMorph eventNameMatches: t1! !
+
 !EventHatMorph methodsFor: 'other' stamp: 'jm 3/31/2005 21:41'!
 helpScreenName
 	"Answer the name of the help screen for this hat block, or nil if no help is available."
@@ -101,6 +105,10 @@ helpScreenName
 	^ nil
 ! !
 
+!EventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:37'!
+isMouseClickEventHatMorph
+	^ false! !
+
 !EventHatMorph methodsFor: 'other' stamp: 'jm 12/8/2005 19:21'!
 printHatNameOn: aStream
 	"Append a human-readable string for this hat block's name to the given stream."
@@ -113,6 +121,14 @@ printHatNameOn: aStream
 	aStream cr.
 
 ! !
+
+!EventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:35'!
+respondsToBackdropName: t1 
+	^ false! !
+
+!EventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:36'!
+respondsToKeyEvent: t1 
+	^ false! !
 
 !EventHatMorph methodsFor: 'other' stamp: 'jm 6/4/2009 12:33'!
 startForEvent: aScratchEvent

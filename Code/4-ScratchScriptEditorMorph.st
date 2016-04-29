@@ -248,15 +248,14 @@ fullDrawOn: aCanvas
 ! !
 
 
-!ScratchScriptEditorMorph methodsFor: 'event handling' stamp: 'ee 2/3/2009 13:28'!
+!ScratchScriptEditorMorph methodsFor: 'event handling' stamp: 'EMP 4/28/2016 16:16'!
 handlesMouseOverDragging: evt
 
 	| m |
 	evt hand submorphs size = 1 ifFalse: [^ false].
 	m _ evt hand firstSubmorph.
 
-	^ m isKindOf: BlockMorph.
-! !
+	^ m isBlockMorph! !
 
 
 !ScratchScriptEditorMorph methodsFor: 'geometry' stamp: 'EMP 4/10/2016 19:03'!

@@ -49,14 +49,16 @@ defaultNames
 	((CommandBlockMorph parseCommandSpec: spec) select: [:s | BlockCreatorMorph isArgSpec: s]) do: [:arg | (arg = '%b') ifTrue: [result add: false] ifFalse: [(arg = '%s') ifTrue: [result add: ''] ifFalse: [result add: '10']]].
 	^ result asArray! !
 
-!ProcedureHatBlockMorph methodsFor: 'accessing' stamp: 'EMP 11/23/2015 14:13'!
+!ProcedureHatBlockMorph methodsFor: 'accessing' stamp: 'EMP 4/27/2016 14:52'!
 editCustomBlock
-	| resultArray |
+	| resultArray oldSpec |
+	oldSpec _ spec.
 	resultArray _ ((BlockCreationDialog forCustomBlock: {spec. self findArgs. isAtomic}) getUserResponse).
 	resultArray = false ifTrue: [^ self beep].
 	self spec: resultArray first first.
 	self params: resultArray first second.
-	self isAtomic: resultArray second.! !
+	self isAtomic: resultArray second.
+	self receiver bindCustom: oldSpec to: spec.! !
 
 !ProcedureHatBlockMorph methodsFor: 'accessing' stamp: 'EMP 11/8/2015 11:29'!
 findArgs
@@ -89,7 +91,11 @@ rightButtonMenu
 ! !
 
 
-!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 1/8/2016 07:53'!
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/15/2016 17:35'!
+argumentCount
+	^ 0! !
+
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/14/2016 12:30'!
 drawArchOn: aCanvas 
 	| diameter rawForm newForm |
 	"The formula for getting the radius of a circle given the explained values is this:
@@ -98,19 +104,19 @@ drawArchOn: aCanvas
 
 
 	"NOTE: Since the height is fixed, I premade some of the calculations to make it quicker"
-	diameter _ (((self width * self width) + 1764) / 84). "remember that the diameter is the radius * 2"
+	diameter _ (((self width * self width) + 1444) / 76). "remember that the diameter is the radius * 2"
 	
 	rawForm _ (EllipseMorph new extent: (diameter@diameter); color: (color); borderColor: (Color r: 142/255 g: 46/255 b: 194/255); borderWidth: 3) imageForm.
 
-	newForm _ rawForm copy: ((((diameter - bounds width) / 2) @ 0) extent: ((bounds width) @ 25)).
+	newForm _ rawForm copy: (((diameter - ((bounds expandBy: 3) width) / 2) @ 0) extent: (((bounds expandBy: 3)width) @ 25)).
 
-	aCanvas paintImage: newForm at: self topLeft.! !
+	aCanvas paintImage: newForm at: self topLeft - (3@0).! !
 
-!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 1/7/2016 18:55'!
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/13/2016 16:12'!
 drawBodyOn: aCanvas 
 
 	| archBottom |
-	archBottom _ self top + self hatTopForm.
+	archBottom _ self top + self hatTopForm + 3.
 
 	self drawArchOn: aCanvas.
 	aCanvas
@@ -124,6 +130,37 @@ drawBodyOn: aCanvas
 		fillRectangle: ((self right - 1)@(archBottom -  1) corner: self right@(self bottom - 7))
 		color: color slightlyDarker slightlyDarker.
 ! !
+
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/14/2016 12:29'!
+drawFinalOn: aCanvas fromCanvas: c
+
+	| flipped |
+	ScratchTranslator isRTL 
+		ifTrue: [flipped _ c form flipBy: #horizontal centerAt: c form center.
+			aCanvas paintImage: flipped at: (self topLeft - (3@3))]
+		ifFalse:[aCanvas paintImage: c form at: (self topLeft - (3@3))].
+! !
+
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/14/2016 12:28'!
+drawOn: aCanvas 
+
+	| c |
+	self computeHighlightColors.
+	c _ FormCanvas extent: (self extent + (12@12)) depth: 32.
+	c _ c copyOffset: (self topLeft - (3@3)) negated.
+	self drawBodyOn: c.
+	self drawBottomEdgeOn: c.
+
+	self drawFinalOn: aCanvas fromCanvas: c.
+! !
+
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/15/2016 17:27'!
+evaluate
+	^ nil! !
+
+!ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 4/27/2016 16:05'!
+evaluateInStackFrame: t1 
+	^ false! !
 
 !ProcedureHatBlockMorph methodsFor: 'private-evaluation' stamp: 'EMP 1/12/2016 16:06'!
 fixBlockLayout
@@ -197,6 +234,15 @@ stop
 		scratchProc stop.
 		scratchProc _ nil].
 ! !
+
+
+!ProcedureHatBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/13/2016 16:06'!
+invalidRect: aRectangle
+	super invalidRect: (aRectangle expandBy: 3)! !
+
+!ProcedureHatBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/28/2016 12:12'!
+isTimed
+	^ false! !
 
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 

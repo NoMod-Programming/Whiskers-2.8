@@ -84,6 +84,10 @@ helpScreenName
 	^ nil
 ! !
 
+!WhenCloneHatBlock methodsFor: 'other' stamp: 'EMP 4/26/2016 16:46'!
+isWhenCloneHat
+	^ true! !
+
 !WhenCloneHatBlock methodsFor: 'other' stamp: 'EMP 10/2/2015 20:50'!
 printHatNameOn: aStream
 	"Append a human-readable string for this hat block's name to the given stream."

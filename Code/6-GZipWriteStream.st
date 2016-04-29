@@ -30,11 +30,11 @@ writeFooter
 	0 to: 3 do:[:i| encoder nextBytePut: (crc >> (i*8) bitAnd: 255)].
 	0 to: 3 do:[:i| encoder nextBytePut: (bytesWritten >> (i*8) bitAnd: 255)].! !
 
-!GZipWriteStream methodsFor: 'initialize-release' stamp: 'EMP 11/20/2015 15:53'!
+!GZipWriteStream methodsFor: 'initialize-release' stamp: 'EMP 4/15/2016 11:15'!
 writeHeader
 	"Write the GZip header"
-	encoder nextBits: 16 put: (GZipConstants associationAt: #GZipMagic).
-	encoder nextBits: 8 put: (GZipConstants associationAt: #GZipDeflated).
+	encoder nextBits: 16 put: GZipMagic.
+	encoder nextBits: 8 put: GZipDeflated.
 	encoder nextBits: 8 put: 0. "No flags"
 	encoder nextBits: 32 put: 0. "no time stamp"
 	encoder nextBits: 8 put: 0. "No extra flags"

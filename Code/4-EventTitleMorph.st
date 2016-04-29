@@ -62,6 +62,10 @@ eventName: aString
 		block fixBlockLayout].
 ! !
 
+!EventTitleMorph methodsFor: 'accessing' stamp: 'EMP 4/26/2016 16:32'!
+eventNameMatches: t1 
+	^ labelMorph contents sameAs: t1! !
+
 !EventTitleMorph methodsFor: 'accessing' stamp: 'jm 4/1/2005 20:34'!
 fixArgLayout
 	"Set my color to my owner's color."

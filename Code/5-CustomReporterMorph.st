@@ -26,6 +26,12 @@ evaluate
 	(arg _ ((procedureHat scratchProc) ifNotNil: [procedureHat scratchProc getArgumentOrNil: (self selector asUTF8)])) ifNil: [^ '0'].
 	^ arg! !
 
+!CustomReporterMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:57'!
+evaluateIn: t1 
+	t1 returnValueToParentFrame: (t1 getArgumentOrNil: self selector).
+	t1 popStackFrameNoUnhightlight.
+	^ false! !
+
 !CustomReporterMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:54'!
 evaluateWithArgs: args
 	| procedureHat arg |
@@ -47,13 +53,15 @@ isBoolean: aBoolean
 isParamGetter
 	^ true! !
 
-!CustomReporterMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:49'!
+!CustomReporterMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/13/2016 15:39'!
 rightButtonMenu
 	| menu choice |
 
 	menu _ CustomMenu new.
 	menu add: 'duplicate' action: #duplicate.
 	menu add: 'delete' action: #delete.
+	menu addLine.
+	menu add: 'add comment' action: #addComment.
 	choice _ menu startUp.
 	choice ifNotNil: [self perform: choice].! !
 

@@ -26,6 +26,14 @@ eventName
 	^ 'Scratch-MouseClickEvent'
 ! !
 
+!MouseClickEventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+eventNameMatches: t1 
+	^ false! !
+
+!MouseClickEventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+isMouseClickEventHatMorph
+	^ true! !
+
 !MouseClickEventHatMorph methodsFor: 'other' stamp: 'jm 12/8/2005 19:22'!
 printHatNameOn: aStream
 	"Append a human-readable string for this hat block's name to the given stream."

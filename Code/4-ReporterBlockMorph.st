@@ -13,10 +13,11 @@ initialize
 ! !
 
 
-!ReporterBlockMorph methodsFor: 'drawing' stamp: 'jm 3/30/2005 09:37'!
+!ReporterBlockMorph methodsFor: 'drawing' stamp: 'EMP 4/20/2016 14:35'!
 drawBooleanOn: aCanvas 
 
-	| right topY bottomY xInset c |
+	| right topY bottomY xInset c majorPointsLeft majorPointsRight |
+
 	self computeHighlightColors.
 
 	right _ self width.
@@ -24,32 +25,69 @@ drawBooleanOn: aCanvas
 	self height even ifTrue: [topY _ bottomY - 1].
 	xInset _ 0.
 	[topY >= 0] whileTrue: [
-		topY = 0 ifTrue: [c _ highlightColor1].
-		topY = 1 ifTrue: [c _ highlightColor2].
-		topY > 1 ifTrue: [c _ color].
+		c _ color.
 		self drawHLineFrom: xInset to: right - xInset y: topY color: c on: aCanvas.
 		(topY > 1) & (xInset > 0) ifTrue: [
-			self drawPoint: xInset@topY color: highlightColor1 on: aCanvas.
-			self drawPoint: (right - xInset - 1)@topY color: shadowColor on: aCanvas].
+			self drawPoint: xInset@topY color: c on: aCanvas.
+			self drawPoint: (right - xInset - 1)@topY color: c on: aCanvas].
 
-		c _ bottomY = (self height - 1) ifTrue: [shadowColor] ifFalse: [color].
 		self drawHLineFrom: xInset to: right - xInset y: bottomY color: c on: aCanvas.
 		xInset > 0 ifTrue: [
-			self drawPoint: xInset@bottomY color: shadowColor on: aCanvas.
-			self drawPoint: (right - xInset - 1)@bottomY color: shadowColor on: aCanvas].
+			self drawPoint: xInset@bottomY color: c on: aCanvas.
+			self drawPoint: (right - xInset - 1)@bottomY color: c on: aCanvas].
 
 		xInset _ xInset + 1.	
 		bottomY _ bottomY + 1.
 		topY _ topY - 1].
+	
+	"Now add the bevel; the steps are:
+	1. draw the top and bottom lines with varying levels of shades, using a list of major points and going from there.
+	2. draw the left side's bevels and fix the area where the two colors meet.
+	3. draw the right side's bevels and fix the area where the two colors meet.
 
-! !
+	"
 
-!ReporterBlockMorph methodsFor: 'drawing' stamp: 'jm 3/30/2005 08:15'!
+	"----------------------------BEGIN STEP 1--------------------------------"
+	majorPointsLeft _ {(((self height // 2)) @ (0)). ((self height // 2) @ ((self height))). (0 @ ((self height // 2)))}.
+	majorPointsRight _ {(self width - ((self height // 2))) @ (0). ((self width - ((self height // 2))) @ (self height)). ((self width) @ ((self height // 2)))}.
+	self drawHLineFrom: (majorPointsLeft first x) to: (majorPointsRight first x) y: 0 color: (Color white mixed: 0.3 with: color) on: aCanvas.
+	self drawHLineFrom: (majorPointsLeft first x) to: (majorPointsRight first x) y: 1 color: (Color white mixed: 0.15 with: color) on: aCanvas.
+	self drawHLineFrom: (majorPointsLeft first x) to: (majorPointsRight first x) y: 2 color: (Color white mixed: 0.07 with: color) on: aCanvas.
+	self drawHLineFrom: (majorPointsLeft second x) to: (majorPointsRight second x) y: (self height) color: (Color black mixed: 0.3 with:  color) on: aCanvas.
+	self drawHLineFrom: (majorPointsLeft second x) to: (majorPointsRight second x) y: (self height - 1) color: (Color black mixed: 0.15 with:  color) on: aCanvas.
+	self drawHLineFrom: (majorPointsLeft second x) to: (majorPointsRight second x) y: (self height - 2) color: (Color black mixed: 0.07 with: color) on: aCanvas.
+	"----------------------------END STEP 1----------------------------------"
+
+	"----------------------------BEGIN STEP 2-------------------------------"
+	aCanvas line: (majorPointsLeft first + (self topLeft)) to: (majorPointsLeft third + (self topLeft)) width: 1 color: (Color white mixed: 0.3 with: color).
+	aCanvas line: (majorPointsLeft second + (self topLeft)) to: (majorPointsLeft third + (self topLeft)) width: 1 color: (Color white mixed: 0.20 with: color).
+	aCanvas line: (majorPointsLeft first + (self topLeft + (0@1))) to: (majorPointsLeft third + (self topLeft + (1@0))) width: 1 color: (Color white mixed: 0.15 with: color).
+	aCanvas line: (majorPointsLeft second + (self topLeft - (0@1))) to: (majorPointsLeft third + (self topLeft + (1@0))) width: 1 color: (Color white mixed: 0.10 with: color).
+	aCanvas line: (majorPointsLeft first + (self topLeft + (0@2))) to: (majorPointsLeft third + (self topLeft + (2@0))) width: 1 color: (Color white mixed: 0.07 with: color).
+	aCanvas line: (majorPointsLeft second + (self topLeft - (0@2))) to: (majorPointsLeft third + (self topLeft + (2@0))) width: 1 color: (Color white mixed: 0.05 with: color).
+	self drawPoint: (majorPointsLeft second + (0@-1)) color: ((Color white mixed: 0.3 with: color) mixed: 0.5 with: (Color black mixed: 0.3 with: color)) on: aCanvas.
+	self drawPoint: (majorPointsLeft second + (1@-2)) color: ((Color white mixed: 0.15 with: color) mixed: 0.5 with: (Color black mixed: 0.15 with: color)) on: aCanvas.
+	self drawPoint: (majorPointsLeft second + (1@-1)) color: ((Color white mixed: 0.3 with: color) mixed: 0.4 with: (Color black mixed: 0.15 with: color)) on: aCanvas.
+	self drawPoint: (majorPointsLeft second + (2@-2)) color: ((Color white mixed: 0.15 with: color) mixed: 0.4 with: (Color black mixed: 0.07 with: color)) on: aCanvas.
+	"-------------------------END STEP 2-----------------------------------"
+
+	"-------------------------BEGIN STEP 3---------------------------------"
+		aCanvas line: (majorPointsRight second + (self topLeft - (1@0))) to: (majorPointsRight third + (self topLeft)) width: 1 color: (Color black mixed: 0.3 with: color).
+		aCanvas line: (majorPointsRight first + (self topLeft)) to: (majorPointsRight third + (self topLeft)) width: 1 color: (Color black mixed: 0.15 with: color).
+		aCanvas line: (majorPointsRight second + (self topLeft - (1@1))) to: (majorPointsRight third + (self topLeft - (1@0))) width: 1 color: (Color black mixed: 0.15 with: color).
+		aCanvas line: (majorPointsRight first + (self topLeft + (0@1))) to: (majorPointsRight third + (self topLeft - (1@0))) width: 1 color: (Color black mixed: 0.07 with: color).
+		aCanvas line: (majorPointsRight second + (self topLeft - (1@2))) to: (majorPointsRight third + (self topLeft - (2@0))) width: 1 color: (Color black mixed: 0.07 with: color).
+		aCanvas line: (majorPointsRight first + (self topLeft + (-1@1))) to: (majorPointsRight third + (self topLeft - (2@0))) width: 1 color: (Color black mixed: 0.04 with: color).
+	self drawPoint: (majorPointsLeft first - (2@-2)) color: ((Color white mixed: 0.15 with: color) mixed: 0.4 with: (Color black mixed: 0.04 with: color)) on: aCanvas.
+	"---------------------------END STEP 3-----------------------------------"! !
+
+!ReporterBlockMorph methodsFor: 'drawing' stamp: 'EMP 4/19/2016 16:44'!
 drawNumericOn: aCanvas 
 
-	| right topY bottomY radius xInset c |
-	self computeHighlightColors.
+	| right topY bottomY radius xInset c points |
 
+	self computeHighlightColors.
+	points _ OrderedCollection new.
 	right _ self width.
 	topY _ bottomY _ radius _ self height // 2.
 	self height even ifTrue: [topY _ bottomY - 1].
@@ -59,12 +97,16 @@ drawNumericOn: aCanvas
 		topY = 0 ifTrue: [c _ highlightColor1].
 		topY = 1 ifTrue: [c _ highlightColor2].
 		topY > 1 ifTrue: [c _ color].
+		points add: (xInset @ topY).
+		points add: (right - xInset @ topY).
 		self drawHLineFrom: xInset to: right - xInset y: topY color: c on: aCanvas.
 		(xInset > 0) & (topY > 1) ifTrue: [
 			self drawPoint: xInset@topY color: highlightColor1 on: aCanvas.
 			self drawPoint: (right - xInset - 1)@topY color: highlightColor1 on: aCanvas].
 
 		c _ bottomY = (self height - 1) ifTrue: [shadowColor] ifFalse: [color].
+		points add: (xInset @ bottomY).
+		points add: (right - xInset @ bottomY).
 		self drawHLineFrom: xInset to: right - xInset y: bottomY color: c on: aCanvas.
 		xInset > 0 ifTrue: [
 			self drawPoint: xInset@bottomY color: shadowColor on: aCanvas.
@@ -72,9 +114,39 @@ drawNumericOn: aCanvas
 
 		bottomY _ bottomY + 1.
 		topY _ topY - 1].
+
+
+		self drawHLineFrom: xInset to: right - xInset y: bottomY color: (Color black mixed: 0.3 with: color) on: aCanvas.
+		self drawHLineFrom: xInset to: right - xInset y: (bottomY - 1) color: (Color black mixed: 0.15 with: color) on: aCanvas.
+		self drawHLineFrom: xInset to: right - xInset y: (bottomY - 2) color: (Color black mixed: 0.07 with: color) on: aCanvas.
+
+		self drawHLineFrom: xInset to: right- xInset y: topY color: (Color white mixed: 0.3 with: color) on: aCanvas.
+		self drawHLineFrom: xInset to: right- xInset y: topY color: (Color white mixed: 0.15 with: color) on: aCanvas.
+		self drawHLineFrom: xInset to: right- xInset y: topY color: (Color white mixed: 0.07 with: color) on: aCanvas.
+		points do: [:point |
+		(((point y > (((self height // 8) + 2))) and: [point x < (self width - xInset)]) and: [point y > 0]) ifTrue: [
+		self drawPoint: point color: (Color white mixed: 0.3 with: color) on: aCanvas.
+		self drawPoint: (point + (1@0)) color: (Color white mixed: 0.15 with: color) on: aCanvas.
+		self drawPoint: (point+ (2@0)) color: (Color white mixed: 0.07 with: color) on: aCanvas].
+		(point y > (self height - (self height // 8))) ifTrue: [
+		self drawPoint: point color: (Color black mixed: 0.3 with: color) on: aCanvas.
+		].
+
+
+		(((point y > (((self height // 8) + 2))) and: [point x > (self width - xInset)]) and: [point y > 0]) ifTrue: [self drawPoint: point color: (Color black mixed: 0.3 with: color) on: aCanvas].
+
+		(((point y < (((self height // 8) + 3))) and: [point x > (self width - xInset)]) and: [point y > 0]) ifTrue: [self drawPoint: point color: ((Color gray: (((self height // 8 + 3)) / (point y)) / 5) mixed: 0.3 with: color) on: aCanvas].
+		].
+		(self height -((self height // 8) rounded + 2)) to: (self height - ((self height // 8) - 1 rounded)) do: [:y |
+			(points select: [:point |
+				point y = y]) do: [:point |
+					self drawPoint: point color: ((Color gray: (
+				1 - ((y - (self height - ((self height // 8) rounded + 2)) + 1) / 4)
+			)) mixed: 0.3 with: color) on: aCanvas
+			]].
 ! !
 
-!ReporterBlockMorph methodsFor: 'drawing' stamp: 'jm 3/28/2005 13:16'!
+!ReporterBlockMorph methodsFor: 'drawing' stamp: 'EMP 4/18/2016 13:08'!
 drawOn: aCanvas 
 
 	self computeHighlightColors.
@@ -138,10 +210,10 @@ initFieldsFrom: anObjStream version: classVersion
 
 ! !
 
-!ReporterBlockMorph methodsFor: 'object i/o' stamp: 'EMP 1/12/2016 15:26'!
+!ReporterBlockMorph methodsFor: 'object i/o' stamp: 'EMP 4/26/2016 16:57'!
 showValue
 
-	| gotError msg tooltip w worldBounds tmp |
+	| gotError msg tooltip w tmp |
 	gotError _ false.
 	(self isSpecialForm) ifTrue: [self start.
 	tmp _ scratchProc.
@@ -161,11 +233,8 @@ showValue
 	gotError ifTrue: [tooltip messageColor: Color red darker].
 
 	w _ self world.
-	w addMorphFront: tooltip.
-	((worldBounds _ w bounds) containsRect: tooltip bounds) ifFalse:
-		[tooltip bounds: (tooltip bounds translatedToBeWithin: worldBounds)].
+	tooltip popUpForHand: (w activeHand).
 	self setProperty: #toolTip toValue: tooltip.
-	tooltip initialCursorPoint: Sensor cursorPoint.
 	tooltip startStepping.! !
 
 !ReporterBlockMorph methodsFor: 'object i/o' stamp: 'jm 5/11/2005 10:50'!
@@ -198,7 +267,7 @@ computeHighlightColors
 	shadowColor _ color mixed: 0.8 with: Color black.
 ! !
 
-!ReporterBlockMorph methodsFor: 'other' stamp: 'ee 3/8/2008 17:08'!
+!ReporterBlockMorph methodsFor: 'other' stamp: 'EMP 4/20/2016 14:36'!
 fixBlockLayout
 	"Update the positions of my submorphs."
 
@@ -213,7 +282,7 @@ fixBlockLayout
 		(m isKindOf: ArgMorph) ifTrue: [m fixArgLayout].
 		(m isKindOf: BlockMorph) ifTrue: [m fixBlockLayout].
 		maxH _ maxH max: m height].
-	h _ (maxH + 4) max: 17.
+	h _ (maxH + 4) max: 20.
 
 	x _ isBoolean ifTrue: [8] ifFalse: [4].
 	(mList size > 0 and: [mList first isKindOf: StringMorph]) ifTrue: [x _ x + 2].
@@ -249,15 +318,19 @@ isReporter
 	^ true
 ! !
 
-!ReporterBlockMorph methodsFor: 'other' stamp: 'jm 3/20/2009 19:54'!
+!ReporterBlockMorph methodsFor: 'other' stamp: 'EMP 4/27/2016 12:08'!
 toggleProcess
-
-	| toolTip |
-	toolTip _ self valueOfProperty: #toolTip.
-	toolTip ifNotNil: [
-		toolTip delete.
-		self setProperty: #toolTip toValue: nil.
-		^ self].
-
-	self showValue.
+	
+	| tooltip |
+	(tooltip _ self valueOfProperty: #toolTip)
+		ifNil: [self showValue]
+		ifNotNil: [ 
+			tooltip delete.
+			self setProperty: #toolTip toValue: nil]
 ! !
+
+
+!ReporterBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:59'!
+evaluateIn: aStackFrame
+	super evaluateIn: aStackFrame.
+	^ false! !

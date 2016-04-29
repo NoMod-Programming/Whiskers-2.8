@@ -56,6 +56,10 @@ addLabel
 			self addMorphBack: (Morph new color: Color transparent; extent: 2@5)]].
 ! !
 
+!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 17:28'!
+allVarNames
+	^ self procedure findArgs! !
+
 !ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 11/9/2015 12:38'!
 asBlockTuple
 	| blockTuple argList arg |
@@ -71,12 +75,12 @@ asBlockTuple
 			ifFalse: [blockTuple at: i + 2 put: arg asBlockTuple]].
 	^ blockTuple! !
 
-!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 11/16/2015 16:39'!
+!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:52'!
 editCustomBlock
 	| block |
 	block _ self receiver procedure: (self commandSpec).
 	block ifNotNil: [
-	block editCustomBlock]! !
+	block editCustomBlock].! !
 
 !ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 11/3/2015 13:47'!
 initialize
@@ -84,7 +88,15 @@ initialize
 	super initialize.
 	self color: (Color r: 89/255 g: 71/255 b:177/255)! !
 
-!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:29'!
+!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 17:25'!
+isAtomic
+	^ self procedure isAtomic! !
+
+!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 17:24'!
+procedure
+	^ self receiver procedure: (self commandSpec).! !
+
+!ProcCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:53'!
 rightButtonMenu
 
 	| menu choice |
@@ -92,7 +104,6 @@ rightButtonMenu
 
 	menu add: 'duplicate' action: #duplicate.
 	menu add: 'delete' action: #delete.
-	
 	menu addLine.
 	menu add: 'add comment' action: #addComment.
 	menu add: 'help' action: #presentHelpScreen.

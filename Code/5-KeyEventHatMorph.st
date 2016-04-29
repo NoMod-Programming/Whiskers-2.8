@@ -56,6 +56,14 @@ eventName
 	^ 'Scratch-KeyPressedEvent'
 ! !
 
+!KeyEventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+eventNameMatches: t1 
+	^ false! !
+
+!KeyEventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+isKeyEventHatMorph
+	^ true! !
+
 !KeyEventHatMorph methodsFor: 'other' stamp: 'jm 12/8/2005 19:22'!
 printHatNameOn: aStream
 	"Append a human-readable string for this hat block's name to the given stream."
@@ -63,13 +71,11 @@ printHatNameOn: aStream
 	aStream nextPutAll: 'when ', scriptNameMorph choice, ' key pressed'; cr.
 ! !
 
-!KeyEventHatMorph methodsFor: 'other' stamp: 'jm 8/9/2007 20:03'!
-respondsToKeyEvent: aMorphicKeyEvent
-
-	| evtAscii |
-	evtAscii _ aMorphicKeyEvent keyCharacter asLowercase asciiValue.
-	evtAscii = Character enter asciiValue ifTrue: [
-		evtAscii _ Character cr asciiValue].
-
-	^ evtAscii = (ScriptableScratchMorph new asciiFor: scriptNameMorph choice asString)
-! !
+!KeyEventHatMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+respondsToKeyEvent: t1 
+	| t2 |
+	t2 := t1 keyCharacter asLowercase asciiValue.
+	t2 = Character enter asciiValue
+		ifTrue: [t2 := Character cr asciiValue].
+	^ t2
+		= (ScriptableScratchMorph new asciiFor: scriptNameMorph choice asString)! !

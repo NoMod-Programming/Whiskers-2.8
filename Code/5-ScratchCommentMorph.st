@@ -36,7 +36,7 @@ addTopBar
 	self addMorphBack: topBarMorph.
 ! !
 
-!ScratchCommentMorph methodsFor: 'initialization' stamp: 'EMP 1/7/2016 14:36'!
+!ScratchCommentMorph methodsFor: 'initialization' stamp: 'EMP 4/28/2016 16:22'!
 initialize
 
 	| bottomBar |
@@ -60,7 +60,7 @@ initialize
 
 	bottomBar _ AlignmentMorph newRow
 		color: Color transparent;
-		centering: #center.
+		centering: #topLeft.
 	resizeMorph _ ScratchResizeMorph ofType: #corner.
 	resizeMorph vResizing: #spaceFill.
 	commentMorph _ MultilineStringMorph new
@@ -146,7 +146,7 @@ aboutToBeGrabbedBy: aHand
 	^ self
 ! !
 
-!ScratchCommentMorph methodsFor: 'dropping/grabbing' stamp: 'jm 3/20/2009 14:06'!
+!ScratchCommentMorph methodsFor: 'dropping/grabbing' stamp: 'EMP 4/28/2016 16:19'!
 attachTargetIn: newOwner
 	"Answer a CommandBlockMorph that is overlapped by the receiver, nil if none."
 
@@ -156,7 +156,7 @@ attachTargetIn: newOwner
 
 	candidates _ newOwner allMorphs select: [:each |
 		(each isKindOf: BlockMorph) and:
-		[each isReporter not and:
+		[((each isReporter) ifTrue: [(each ownerThatIsANotSelf: CommandBlockMorph) isNil] ifFalse: [true]) and:
 		[each hasComment not and:
 		[self bounds intersects: each bounds]]]].
 
@@ -256,7 +256,7 @@ handlesMouseDown: evt
 	^ true
 ! !
 
-!ScratchCommentMorph methodsFor: 'event handling' stamp: 'EMP 1/7/2016 14:50'!
+!ScratchCommentMorph methodsFor: 'event handling' stamp: 'EMP 4/28/2016 16:24'!
 mouseDown: evt
 	"Handle a mouse click. Left button either drags or performs click action. Right button brings up a menu."
 
@@ -267,18 +267,17 @@ mouseDown: evt
 	p _ evt cursorPoint.
 
 	((showHideMorph bounds expandBy: 4) containsPoint: p) ifTrue: [^ self toggleShowing].
+	((resizeMorph bounds expandBy: 4) containsPoint: p)	ifTrue: [isResizing _ true.
+				^ resizeOffset _ self bottomRight - p].
 	(isShowing and: [commentMorph containsPoint: p])
 		ifTrue: [^ commentMorph mouseDown: evt].
 
 	evt rightButtonPressed
 		ifTrue: [Sensor waitNoButton. ^ self rightButtonMenu]
-		ifFalse:	[((resizeMorph bounds expandBy: 4) containsPoint: p)
-			ifFalse: [evt hand grabMorph: self]
-			ifTrue: [isResizing _ true.
-				resizeOffset _ self bottomRight - p]].
+		ifFalse:	[evt hand grabMorph: self]
 ! !
 
-!ScratchCommentMorph methodsFor: 'event handling' stamp: 'EMP 1/7/2016 14:52'!
+!ScratchCommentMorph methodsFor: 'event handling' stamp: 'EMP 4/28/2016 16:27'!
 mouseMove: evt
 
 	| p |
@@ -289,7 +288,7 @@ mouseMove: evt
 		self width: (self defaultWidth max: ((p - self topLeft) + resizeOffset) x).
 		commentMorph width: self width - (resizeMorph width).
 		self height: (40 max: ((p + resizeOffset) - self topLeft) y).
-		commentMorph height: self height - (resizeMorph height)].
+		commentMorph height: self height - 17].
 ! !
 
 !ScratchCommentMorph methodsFor: 'event handling' stamp: 'ee 8/11/2008 13:04'!
@@ -447,7 +446,7 @@ resetAnchorOffset
 	self updatePosition.
 ! !
 
-!ScratchCommentMorph methodsFor: 'private' stamp: 'EMP 1/7/2016 14:55'!
+!ScratchCommentMorph methodsFor: 'private' stamp: 'EMP 4/28/2016 16:27'!
 toggleShowing
 
 	| colors |
@@ -464,7 +463,9 @@ toggleShowing
 			lastHeight ifNil: [lastHeight _ 40].
 			self height: lastHeight.
 			self comeToFront.
-			self color: self commentMorphColor]
+			self color: self commentMorphColor.
+			commentMorph width: self width - (resizeMorph width).
+			commentMorph height: self height - 17]
 		ifFalse: [
 			showHideMorph form: (ScratchFrameMorph skinAt: #arrowClosedComment).
 			showHideMorph form colors: colors.

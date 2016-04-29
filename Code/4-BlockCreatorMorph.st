@@ -118,18 +118,18 @@ fixParametersWith: anOrderedCollectionOfValues
 	i _ 0.
 	args do: [:arg | i _ i + 1. arg stringExpression: (anOrderedCollectionOfValues at: i ifAbsent: [self defaultNameForArgMorph: arg])].! !
 
-!BlockCreatorMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/11/2016 16:18'!
+!BlockCreatorMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/16/2016 16:25'!
 getBlockName
 	| label varNames |
 	label _ ''.
 	varNames _ OrderedCollection new.
 	((self submorphs select: [:m | m isArgMorph]) collect: [:morph | morph evaluate]) do: [:m | (m first = #arg) ifTrue: [label _ label, ' ', ((m second) caseOf: {
-		[#string] -> [varNames add: m third. '%s'].
-		[#boolean] -> [varNames add: m third. '%b'].
-		[#color] -> [varNames add: m third. '%c'].
-		[#number] -> [varNames add: m third. '%n']
+		[#string] -> [varNames add: m third. ' %s '].
+		[#boolean] -> [varNames add: m third. ' %b '].
+		[#color] -> [varNames add: m third. ' %c '].
+		[#number] -> [varNames add: m third. ' %n ']
 		}
-		otherwise: [varNames add: m third. (m fourth)]
+		otherwise: [varNames add: m third. ' ',(m fourth), ' ']
 )] ifFalse: [label _ label, ((((m second copyReplaceAll: '\' with: '\\\\') copyReplaceAll: '/' with: '\/') copyReplaceAll: '%' with: '\\%') copyReplaceAll: '@' with: '\\@') asString]
 ].
 	^ {label. varNames asArray}! !

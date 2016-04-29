@@ -147,7 +147,7 @@ topArgMorphAt: aRectangle exclude: aMorph
 	^ nil
 ! !
 
-!ScratchScriptsMorph methodsFor: 'stepping' stamp: 'md 3/1/2004 16:45'!
+!ScratchScriptsMorph methodsFor: 'stepping' stamp: 'EMP 4/28/2016 16:20'!
 topBlockMorphAt: aPoint exclude: aMorph
 	"Give feedback about possible drop targets."
 
@@ -157,7 +157,7 @@ topBlockMorphAt: aPoint exclude: aMorph
 		ifNone: [^ nil].
 
 	blocksUnderHand _ OrderedCollection new.
-	stack allMorphsDo: [:s | ((s isKindOf: BlockMorph) and: [s bounds containsPoint: aPoint]) 
+	stack allMorphsDo: [:s | ((s isKindOf: BlockMorph) and: [s fullBounds containsPoint: aPoint]) 
 		ifTrue: 	[blocksUnderHand addLast: s]
 	].
 	
@@ -167,29 +167,63 @@ topBlockMorphAt: aPoint exclude: aMorph
 ! !
 
 
-!ScratchScriptsMorph methodsFor: 'event handling' stamp: 'ee 7/1/2008 20:40'!
+!ScratchScriptsMorph methodsFor: 'event handling' stamp: 'EMP 4/13/2016 15:25'!
+block: b fitsInColumn: c
+
+	| bTop bBottom |
+	bTop _ b top.
+	bBottom _ b bottom.
+
+	c do: [:other |
+		((other top > bBottom) | (other bottom < bTop)) ifFalse: [^ false]].
+	^ true! !
+
+!ScratchScriptsMorph methodsFor: 'event handling' stamp: 'EMP 4/27/2016 15:28'!
 cleanUp
-	"Align all scripts vertically in alphabetical order"
+	| stacks columns assigned columnWidths w nextX col nextY maxWidth maxY |
+	"
+Clean up the layout of stacks and blocks in the scripts pane.
+		Steps:
+			1. Collect stacks and sort by x
+			2. Assign stacks to columns such that the y-ranges of all stacks in a column do not overlap
+			3. Compute the column widths
+			4. Move stacks into place
+	"
 
-	| sortedBlocks y collectedBlocks |
-	collectedBlocks _ OrderedCollection new.
-	submorphs do: [:m | (m isKindOf: BlockMorph) ifTrue:[collectedBlocks add: m]].
-	sortedBlocks _ collectedBlocks copy sortBy: [:s1 :s2 | s1 top < s2 top].
+	stacks _ ((self submorphs select: [:m | (m isKindOf: BlockMorph) | (m isKindOf: ScratchCommentMorph)]) sort: [:m :n | m left < n left]).
+	columns _ OrderedCollection new.
 
-	y _ 20.
-	(owner isKindOf: ScrollFrameMorph2) ifTrue: [
-		owner hScrollPixels: 0.
-		owner vScrollPixels: 0].
-	sortedBlocks do: [:s |
-		ScratchTranslator isRTL
-			ifTrue: [(owner isKindOf: ScrollFrameMorph2)
-				ifTrue: [s position: (owner left + owner visibleExtent x - s width - 29)@(self top + y)]
-				ifFalse: [s position: (self right - s width - 20)@(self top + y)]]
-			ifFalse: [s position: self position + (20@y)].
-		y _ y + s fullBounds height + 15].
+	stacks do: [:b | 
+		assigned _ false.
+			columns do: [:m | 
+				(assigned) ifFalse: [
+					(self block: b fitsInColumn: m) ifTrue: [
+						assigned _ true.
+						m add: b]]].
+			(assigned) ifFalse: [
+			columns add: ({b} asOrderedCollection)]].
 
-	self layoutChanged.
-! !
+	columnWidths _ OrderedCollection new.
+	maxWidth _ 0.
+	columns do: [:m |
+		m asArray sort: [:b1 :b2 | b1 top < b2 top].
+		w _ 0.
+		m do: [:b | w _ w max: (b fullBounds width)].
+		columnWidths add: w.
+		maxWidth _ maxWidth + w + 10].
+
+	nextX _ 10.
+	maxY _ 0.
+	(1 to: (columns size)) do: [:i |
+		col _ columns at: i.
+		nextY _ 13.
+		col do: [:b |
+			b left: (nextX + self left).
+			b top: (nextY + self top).
+			nextY _ nextY + (b fullBounds height) + 10.
+			maxY _ maxY max: (nextY)].
+		nextX _ nextX + 10 + (columnWidths at: i)].
+	self extent: maxWidth@maxY! !
 
 !ScratchScriptsMorph methodsFor: 'event handling' stamp: 'md 2/18/2004 14:58'!
 handlesMouseDown: evt
@@ -359,7 +393,7 @@ isScreenshooting
 	^ screenshooting ifNil: [screenshooting _ false]
 ! !
 
-!ScratchScriptsMorph methodsFor: 'screenshot' stamp: 'jens 3/9/2009 13:44'!
+!ScratchScriptsMorph methodsFor: 'screenshot' stamp: 'EMP 4/13/2016 15:37'!
 screenshot
 	"answer a Form of myself apt for exporting"
 
@@ -370,11 +404,12 @@ screenshot
 	saveForm _ self imageForm.
 
 	"clip"
-
+	leftX _ topY _ rightX _ bottomY _ 0.
+	submorphs size = 0 ifFalse: [
 	leftX _ submorphs anyOne left.
 	topY _ submorphs anyOne top.
 	rightX _ submorphs anyOne right.
-	bottomY _ submorphs anyOne bottom.
+	bottomY _ submorphs anyOne bottom].
 	(self allMorphs select: [:m | m ~= self]) do: [:m |
 		leftX _ leftX min: m left.
 		topY _ topY min: m top.

@@ -47,6 +47,14 @@ eventName
 	^ 'Scratch-BackDropChanged'
 ! !
 
+!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:33'!
+eventNameMatches: t1 
+	^ false! !
+
+!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:34'!
+isBackdropEventHatMorph
+	^ true! !
+
 !BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 10/2/2015 19:54'!
 printHatNameOn: aStream
 	"Append a human-readable string for this hat block's name to the given stream."
@@ -54,12 +62,10 @@ printHatNameOn: aStream
 	aStream nextPutAll: 'when backdrop switches to ', scriptNameMorph choice; cr.
 ! !
 
-!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 10/2/2015 19:43'!
-respondsToBackdrop: aBackdropName
+!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:33'!
+respondsToBackdrop: t1 
+	^ scriptNameMorph choice = t1! !
 
-	^ (scriptNameMorph choice == aBackdropName)! !
-
-!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 10/2/2015 19:59'!
-respondsToBackdropName: aBackdropName
-
-	^ (scriptNameMorph choice == aBackdropName)! !
+!BackdropHatBlockMorph methodsFor: 'other' stamp: 'EMP 4/26/2016 16:33'!
+respondsToBackdropName: t1 
+	^ scriptNameMorph choice = t1! !

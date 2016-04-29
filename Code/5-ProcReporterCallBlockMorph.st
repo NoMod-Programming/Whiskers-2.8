@@ -56,15 +56,19 @@ addLabel
 			self addMorphBack: (Morph new color: Color transparent; extent: 2@5)]].
 ! !
 
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 19:25'!
+allVarNames
+	^ self procedure findArgs! !
+
 !ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:28'!
 argumentAt: index
 	^ argMorphs at: index "override the superclass method"! !
 
-!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 14:19'!
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/28/2016 12:25'!
 asBlockTuple
 	| blockTuple argList arg |
 	blockTuple _ Array new: argMorphs size + 2.
-	blockTuple at: 1 put: #call.
+	blockTuple at: 1 put: #callReporter.
 	blockTuple at: 2 put: (self commandSpec).
 	argList _ argMorphs.
 	argList _ self organizeArgs: argList.
@@ -75,20 +79,29 @@ asBlockTuple
 			ifFalse: [blockTuple at: i + 2 put: arg asBlockTuple]].
 	^ blockTuple! !
 
-!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 14:19'!
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 14:52'!
 editCustomBlock
 	| block |
 	block _ self receiver procedure: (self commandSpec).
 	block ifNotNil: [
-	block editCustomBlock]! !
+	block editCustomBlock].! !
 
-!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:41'!
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/16/2016 11:52'!
 evaluate
-	| tmp |
 	self start.
-	tmp _ scratchProc.
-	[tmp isRunning] whileTrue: [World doOneCycleNow].
-	^ tmp answer asString! !
+	scratchProc stepUntilDoneFor: (receiver ownerThatIsA: ScratchStageMorph).
+	^ scratchProc answer! !
+
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/27/2016 15:15'!
+evaluateIn: aStackFrame
+	super evaluateIn: aStackFrame.
+	^ false! !
+
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/16/2016 11:52'!
+evaluateWithArgs: t1 
+	self start.
+	scratchProc stepUntilDoneFor: (receiver ownerThatIsA: ScratchStageMorph).
+	^ scratchProc answer! !
 
 !ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 14:19'!
 initialize
@@ -96,9 +109,17 @@ initialize
 	super initialize.
 	self color: (Color r: 89/255 g: 71/255 b:177/255)! !
 
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 19:25'!
+isAtomic
+	^ self procedure isAtomic! !
+
 !ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/5/2016 12:21'!
 isSpecialForm
 	^ true! !
+
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/15/2016 19:25'!
+procedure
+	^ self receiver procedure: (self commandSpec).! !
 
 !ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 1/12/2016 15:29'!
 rightButtonMenu
@@ -119,3 +140,34 @@ rightButtonMenu
 	
 	(choice _ menu localize; startUp) ifNil: [^ self] ifNotNil: [^ self perform: choice]
 ! !
+
+!ProcReporterCallBlockMorph methodsFor: 'as yet unclassified' stamp: 'EMP 4/16/2016 16:28'!
+showValue
+	| t1 t2 t3 t4 t5 |
+	t1 _ false.
+	
+	[self start.
+	scratchProc stepUntilDoneFor: (receiver ownerThatIsA: ScratchStageMorph).
+	t2 _ scratchProc answer] ifError: 
+			[t1 _ true.
+			t2 _ 'Error!!'].
+	(t2 isKindOf: Morph)
+		ifTrue: [(t2 respondsTo: #displayForm)
+				ifTrue: [t2 _ t2 displayForm]
+				ifFalse: [t2 _ t2 imageForm]]
+		ifFalse: [t2 _ t2 asString].
+	((self isBooleanReporter or: [t2 = 'Error!!'])
+		and: [t2 isKindOf: String])
+		ifTrue: [t2 _ t2 localized].
+	t3 _ (ScratchReporterToolTipMorph string: t2 for: self) left: self right;
+			 bottom: self top.
+	ScratchTranslator isRTL ifTrue: [t3 right: self left].
+	t1 ifTrue: [t3 messageColor: Color red darker].
+	t4 _ self world.
+	t4 ifNil: [^ self].
+	t4 addMorphFront: t3.
+	((t5 _ t4 bounds) containsRect: t3 bounds)
+		ifFalse: [t3 bounds: (t3 bounds translatedToBeWithin: t5)].
+	self setProperty: #toolTip toValue: t3.
+	t3 initialCursorPoint: Sensor cursorPoint.
+	t3 startStepping! !

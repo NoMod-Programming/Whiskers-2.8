@@ -1003,6 +1003,10 @@ macToISOLatin
 	^ result
 ! !
 
+!String methodsFor: 'converting' stamp: 'EMP 4/27/2016 13:27'!
+readStream
+	^ ReadStream on: self! !
+
 !String methodsFor: 'converting'!
 sansPeriodSuffix
 	"Return a copy of the receiver up to, but not including, the first period.  If the receiver's *first* character is a period, then just return the entire receiver. "
@@ -1235,6 +1239,10 @@ withoutTrailingDigits
 "
 ! !
 
+!String methodsFor: 'converting' stamp: 'EMP 4/27/2016 13:27'!
+writeStream
+	^ WriteStream on: self! !
+
 
 !String methodsFor: 'displaying' stamp: 'jm 5/30/2003 13:17'!
 display
@@ -1447,6 +1455,10 @@ withSqueakLineEndings
 	! !
 
 
+!String methodsFor: 'testing' stamp: 'EMP 4/16/2016 11:33'!
+isString
+	^ true! !
+
 !String methodsFor: 'testing' stamp: 'sw 11/5/1998 17:41'!
 lastSpacePosition
 	"Answer the character position of the final space or other separator character in the receiver, and 0 if none"
@@ -1599,6 +1611,14 @@ jsonWriteOn: aStream
 			ifNotNil: [ aStream nextPut: $\; nextPut: replacement ].
 	].
 	aStream nextPut: $".
+! !
+
+
+!String methodsFor: '*jsbridge-core' stamp: 'bf 11/25/2014 18:12'!
+asJSArgument
+	"converted to JS string by plugin"
+	self class isBytes ifTrue: [^self].
+	^super asJSArgument
 ! !
 
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!

@@ -46,6 +46,10 @@ variable
 ! !
 
 
+!VariableBlockMorph methodsFor: 'evaluation' stamp: 'EMP 4/26/2016 16:17'!
+evaluateInStackFrame: t1 
+	^ self evaluateWithArgs: nil! !
+
 !VariableBlockMorph methodsFor: 'evaluation' stamp: 'jm 11/15/2006 11:38'!
 evaluateWithArgs: args
 	"Overridden to read my variable value."
@@ -119,7 +123,7 @@ rename
 
 	self receiver bindVar: (self commandSpec) to: (newName) fromBlock: self.! !
 
-!VariableBlockMorph methodsFor: 'private' stamp: 'EMP 12/12/2015 11:33'!
+!VariableBlockMorph methodsFor: 'private' stamp: 'EMP 4/13/2016 15:42'!
 rightButtonMenu
 
 	| menu sFrame choice spec |
@@ -136,8 +140,6 @@ rightButtonMenu
 	]
 	
 	ifFalse: [
-		menu add: 'help' action: #presentHelpScreen.
-		menu addLine.
 		(#(+ - * / \\) includes: selector) ifTrue: [
 			#(+ - * / mod) with: #(+ - * / \\) do: [:s :op | menu add: s action: op]].
 		(#(< = >) includes: selector) ifTrue: [
@@ -148,7 +150,10 @@ rightButtonMenu
 		menu addLine.
 		menu add: 'duplicate' action: #duplicate.
 		(self owner isKindOf: BlockMorph) ifFalse: [  "can't yet delete a blocks inside a script"
-			menu add: 'delete' action: #delete]].
+			menu add: 'delete' action: #delete].
+		menu addLine.
+		menu add: 'add comment' action: #addComment.
+		menu add: 'help' action: #presentHelpScreen.].
 
 	sFrame _ self ownerThatIsA: ScratchFrameMorph.
 	(sFrame notNil and: [#(sensor: sensorPressed:) includes: selector]) ifTrue: [
@@ -163,7 +168,7 @@ rightButtonMenu
 		menu add: 'show tuples' action: #showTuples].
 	
 	(choice _ menu localize; startUp) ifNil: [^ self].
-	(#(presentHelpScreen duplicate delete rename delVar) includes: choice) ifTrue: [^ self perform: choice].
+	(#(presentHelpScreen duplicate delete rename delVar addComment) includes: choice) ifTrue: [^ self perform: choice].
 	choice = #showSensorBoard ifTrue: [sFrame showSensorBoard. ^ self].
 	choice = #enableRemoteSensors ifTrue: [sFrame enableRemoteSensors. ^ self].
 	choice = #exitScratchSession ifTrue: [sFrame exitScratchSession. ^ self].
